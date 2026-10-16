@@ -66,12 +66,7 @@ public class OrdenServicioService {
 
             // Emisión Nativa Web Push (con pantalla bloqueada o app cerrada)
             try {
-                pushNotificationService.enviarNotificacionANativo(
-                        tecnico.getId(),
-                        "¡Nueva Orden Asignada! #" + guardada.getCodigoOrden(),
-                        "Tienes un nuevo servicio de " + guardada.getTipoServicio() + " asignado.",
-                        "/tecnico/ordenes"
-                );
+                pushNotificationService.enviarNotificacionNuevaOrden(tecnico.getId(), ordenDto);
             } catch (Exception ignored) {
             }
         }
