@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class TecnicoService {
     private final OrdenServicioRepository ordenServicioRepository;
     private final CloudinaryService cloudinaryService;
     private final PasswordEncoder passwordEncoder;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional(readOnly = true)
     public List<TecnicoResumenDto> listarTecnicos(Boolean soloActivos) {
@@ -162,26 +164,31 @@ public class TecnicoService {
         return obtenerPerfilPorCorreo(correo);
     }
 
-    @Transactional
     public PerfilTecnicoDto actualizarFirma(String correo, String firmaBase64) {
-        Usuario usuario = usuarioRepository.findByCorreo(correo)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado con correo: " + correo));
-
         if (firmaBase64 == null || firmaBase64.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La firma no puede estar vacía.");
         }
 
+        // Subida externa a Cloudinary fuera de la transacción de base de datos
+        String url;
         try {
-            String url = firmaBase64.startsWith("http://") || firmaBase64.startsWith("https://")
+            url = (firmaBase64.startsWith("http://") || firmaBase64.startsWith("https://"))
                     ? firmaBase64
                     : cloudinaryService.subirBase64(firmaBase64, "firmas-tecnicos");
-            usuario.setFirmaUrl(url);
-            usuarioRepository.save(usuario);
         } catch (Exception e) {
             log.error("Error al subir firma de técnico a Cloudinary: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo procesar la firma digital.");
         }
 
-        return obtenerPerfilPorCorreo(correo);
+        // Transacción rápida de BD para persistir la URL y retornar el perfil
+        return transactionTemplate.execute(status -> {
+            Usuario usuario = usuarioRepository.findByCorreo(correo)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado con correo: " + correo));
+
+            usuario.setFirmaUrl(url);
+            usuarioRepository.save(usuario);
+
+            return obtenerPerfilPorCorreo(correo);
+        });
     }
 }

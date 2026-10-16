@@ -2,7 +2,7 @@
 Backend REST para gestión de asistencias técnicas domiciliarias (móvil técnicos y web administración).
 
 ## Stack y Estructura
-- Java 21, Spring Boot 3.x, Spring Data JPA, Hibernate, PostgreSQL (Neon Serverless).
+- Java 25 (LTS), Spring Boot 3.x, Spring Data JPA, Hibernate, PostgreSQL (Neon Serverless).
 - Entidades en `com.asistencias247.api.entity`.
 - Repositorios en `com.asistencias247.api.repository`.
 - Servicios en `com.asistencias247.api.service`.

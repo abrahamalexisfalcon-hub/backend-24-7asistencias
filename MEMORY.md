@@ -99,3 +99,8 @@ Implementación completa y pixel-perfect del prototipo móvil en [`frontend/src/
   * `tsc -b`: Cero errores de tipos y sintaxis (100% limpio).
   * `vite build`: Build de producción generado en ~5.2s.
   * PWA Service Worker y precache de 12 recursos generados correctamente.
+
+## Runtime Java
+- Runtime actualizado a Java 25 LTS en Maven (`pom.xml`) y en las imágenes Docker de compilación y ejecución (`Dockerfile`).
+- `AGENTS.md` refleja ahora Java 25 LTS como versión del proyecto.
+- Validado con `.\mvnw.cmd clean compile` usando JDK 25.0.3: `BUILD SUCCESS`.

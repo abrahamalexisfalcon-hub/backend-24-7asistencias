@@ -23,6 +23,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        if (path == null) {
+            return false;
+        }
+        return path.startsWith("/api/auth/")
+                || path.equals("/api/health")
+                || path.startsWith("/api/health/")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-resources")
+                || path.startsWith("/webjars");
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
@@ -54,8 +69,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
-        } catch (Exception ignored) {
-            // Ignorar tokens expirados o corruptos para delegar la autorización a Spring Security
+        } catch (Exception ex) {
+            // Limpia el contexto en caso de token expirado o firma inválida sin arrojar 500 no capturado
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

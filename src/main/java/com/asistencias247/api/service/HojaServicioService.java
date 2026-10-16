@@ -11,120 +11,188 @@ import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.repository.HojaServicioRepository;
 import com.asistencias247.api.repository.MaterialRepository;
 import com.asistencias247.api.repository.OrdenServicioRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class HojaServicioService {
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final HojaServicioRepository hojaServicioRepository;
     private final MaterialRepository materialRepository;
     private final CloudinaryService cloudinaryService;
+    private final Executor mediaUploadExecutor;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    public HojaServicioService(
+            OrdenServicioRepository ordenServicioRepository,
+            HojaServicioRepository hojaServicioRepository,
+            MaterialRepository materialRepository,
+            CloudinaryService cloudinaryService,
+            @Qualifier("mediaUploadExecutor") Executor mediaUploadExecutor,
+            TransactionTemplate transactionTemplate) {
+        this.ordenServicioRepository = ordenServicioRepository;
+        this.hojaServicioRepository = hojaServicioRepository;
+        this.materialRepository = materialRepository;
+        this.cloudinaryService = cloudinaryService;
+        this.mediaUploadExecutor = mediaUploadExecutor;
+        this.transactionTemplate = transactionTemplate;
+    }
+
+    /**
+     * Cierra la hoja de servicio procesando multimedia concurrentemente fuera de la transacción
+     * para no agotar el pool de conexiones a la base de datos (NeonDB Pooler).
+     */
     public HojaServicio cerrarHojaServicio(Long ordenId, CierreHojaServicioRequest request) {
-        OrdenServicio orden = ordenServicioRepository.findById(ordenId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId));
-
-        HojaServicio hoja = orden.getHojaServicio();
-        if (hoja == null) {
-            hoja = HojaServicio.builder()
-                    .ordenServicio(orden)
-                    .materiales(new ArrayList<>())
-                    .build();
+        // 1. Verificación preliminar rápida
+        if (!ordenServicioRepository.existsById(ordenId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId);
         }
 
-        if (request != null) {
-            if (request.getEvaluacionAveria() != null) {
-                hoja.setEvaluacionAveria(request.getEvaluacionAveria());
+        // 2. Subida concurrente a Cloudinary fuera de cualquier transacción activa
+        CompletableFuture<String> firmaDigitalFuture = CompletableFuture.supplyAsync(
+                () -> request != null ? procesarImagenOUrl(request.getFirmaDigitalUrl(), "firmas") : null,
+                mediaUploadExecutor
+        );
+
+        CompletableFuture<String> firmaTecnicoFuture = CompletableFuture.supplyAsync(
+                () -> request != null ? procesarImagenOUrl(request.getFirmaTecnicoUrl(), "firmas-tecnicos") : null,
+                mediaUploadExecutor
+        );
+
+        CompletableFuture<String> fotoInicialFuture = CompletableFuture.supplyAsync(
+                () -> request != null ? procesarImagenOUrl(request.getFotoInicialUrl(), "evidencias") : null,
+                mediaUploadExecutor
+        );
+
+        CompletableFuture<String> fotoFinalFuture = CompletableFuture.supplyAsync(
+                () -> request != null ? procesarImagenOUrl(request.getFotoFinalUrl(), "evidencias") : null,
+                mediaUploadExecutor
+        );
+
+        String urlFirma;
+        String urlFirmaTec;
+        String urlFotoInicial;
+        String urlFotoFinal;
+
+        try {
+            CompletableFuture.allOf(firmaDigitalFuture, firmaTecnicoFuture, fotoInicialFuture, fotoFinalFuture).join();
+            urlFirma = firmaDigitalFuture.join();
+            urlFirmaTec = firmaTecnicoFuture.join();
+            urlFotoInicial = fotoInicialFuture.join();
+            urlFotoFinal = fotoFinalFuture.join();
+        } catch (CompletionException ce) {
+            Throwable cause = ce.getCause() != null ? ce.getCause() : ce;
+            if (cause instanceof ResponseStatusException rse) {
+                throw rse;
             }
-            if (request.getDetalleSolucion() != null) {
-                hoja.setDetalleSolucion(request.getDetalleSolucion());
+            log.error("Error al procesar archivos multimedia en Cloudinary: {}", cause.getMessage(), cause);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo procesar la evidencia o firma.");
+        }
+
+        // 3. Persistencia atómica de corta duración en base de datos
+        return transactionTemplate.execute(status -> {
+            OrdenServicio orden = ordenServicioRepository.findById(ordenId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId));
+
+            HojaServicio hoja = orden.getHojaServicio();
+            if (hoja == null) {
+                hoja = HojaServicio.builder()
+                        .ordenServicio(orden)
+                        .materiales(new ArrayList<>())
+                        .build();
             }
-            if (request.getSugerencias() != null) {
-                hoja.setSugerencias(request.getSugerencias());
-            }
-            if (request.getCalificacion() != null) {
-                hoja.setCalificacion(request.getCalificacion());
-            }
-            if (request.getFirmaDigitalUrl() != null && !request.getFirmaDigitalUrl().isBlank()) {
-                String urlFirma = procesarImagenOUrl(request.getFirmaDigitalUrl(), "firmas");
-                hoja.setFirmaDigitalUrl(urlFirma);
-                log.info("Firma del afiliado procesada y asignada para orden {}: {}", ordenId, urlFirma);
-            }
-            if (request.getFirmaTecnicoUrl() != null && !request.getFirmaTecnicoUrl().isBlank()) {
-                String urlFirmaTec = procesarImagenOUrl(request.getFirmaTecnicoUrl(), "firmas-tecnicos");
-                if (orden.getTecnico() != null && (orden.getTecnico().getFirmaUrl() == null || orden.getTecnico().getFirmaUrl().isBlank())) {
-                    orden.getTecnico().setFirmaUrl(urlFirmaTec);
-                    log.info("Firma del técnico procesada y persistida en perfil para orden {}: {}", ordenId, urlFirmaTec);
+
+            if (request != null) {
+                if (request.getEvaluacionAveria() != null) {
+                    hoja.setEvaluacionAveria(request.getEvaluacionAveria());
                 }
-            }
-            if (request.getFotoInicialUrl() != null && !request.getFotoInicialUrl().isBlank()) {
-                hoja.setFotoInicialUrl(procesarImagenOUrl(request.getFotoInicialUrl(), "evidencias"));
-            }
-            if (request.getFotoFinalUrl() != null && !request.getFotoFinalUrl().isBlank()) {
-                hoja.setFotoFinalUrl(procesarImagenOUrl(request.getFotoFinalUrl(), "evidencias"));
-            }
+                if (request.getDetalleSolucion() != null) {
+                    hoja.setDetalleSolucion(request.getDetalleSolucion());
+                }
+                if (request.getSugerencias() != null) {
+                    hoja.setSugerencias(request.getSugerencias());
+                }
+                if (request.getCalificacion() != null) {
+                    hoja.setCalificacion(request.getCalificacion());
+                }
+                if (urlFirma != null) {
+                    hoja.setFirmaDigitalUrl(urlFirma);
+                    log.info("Firma del afiliado procesada y asignada para orden {}: {}", ordenId, urlFirma);
+                }
+                if (urlFirmaTec != null) {
+                    if (orden.getTecnico() != null && (orden.getTecnico().getFirmaUrl() == null || orden.getTecnico().getFirmaUrl().isBlank())) {
+                        orden.getTecnico().setFirmaUrl(urlFirmaTec);
+                        log.info("Firma del técnico procesada y persistida en perfil para orden {}: {}", ordenId, urlFirmaTec);
+                    }
+                }
+                if (urlFotoInicial != null) {
+                    hoja.setFotoInicialUrl(urlFotoInicial);
+                }
+                if (urlFotoFinal != null) {
+                    hoja.setFotoFinalUrl(urlFotoFinal);
+                }
 
-            if (hoja.getMateriales() == null) {
-                hoja.setMateriales(new ArrayList<>());
-            } else {
-                hoja.getMateriales().clear();
-            }
+                if (hoja.getMateriales() == null) {
+                    hoja.setMateriales(new ArrayList<>());
+                } else {
+                    hoja.getMateriales().clear();
+                }
 
-            if (request.getMateriales() != null) {
-                for (MaterialConsumidoDto item : request.getMateriales()) {
-                    MaterialServicio materialServicio = MaterialServicio.builder()
-                            .hojaServicio(hoja)
-                            .cantidad(item.getCantidad() != null ? item.getCantidad() : 1)
-                            .build();
+                if (request.getMateriales() != null) {
+                    for (MaterialConsumidoDto item : request.getMateriales()) {
+                        MaterialServicio materialServicio = MaterialServicio.builder()
+                                .hojaServicio(hoja)
+                                .cantidad(item.getCantidad() != null ? item.getCantidad() : 1)
+                                .build();
 
-                    if (item.getMaterialId() != null) {
-                        Material material = materialRepository.findById(item.getMaterialId()).orElse(null);
-                        if (material != null) {
-                            materialServicio.setMaterial(material);
-                            materialServicio.setEsPersonalizado(false);
-                            materialServicio.setDescripcion(
-                                    item.getDescripcion() != null && !item.getDescripcion().isBlank()
-                                            ? item.getDescripcion()
-                                            : material.getNombre()
-                            );
+                        if (item.getMaterialId() != null) {
+                            Material material = materialRepository.findById(item.getMaterialId()).orElse(null);
+                            if (material != null) {
+                                materialServicio.setMaterial(material);
+                                materialServicio.setEsPersonalizado(false);
+                                materialServicio.setDescripcion(
+                                        item.getDescripcion() != null && !item.getDescripcion().isBlank()
+                                                ? item.getDescripcion()
+                                                : material.getNombre()
+                                );
+                            } else {
+                                materialServicio.setMaterial(null);
+                                materialServicio.setEsPersonalizado(true);
+                                materialServicio.setDescripcion(item.getDescripcion() != null && !item.getDescripcion().isBlank() ? item.getDescripcion() : "Material");
+                            }
                         } else {
                             materialServicio.setMaterial(null);
                             materialServicio.setEsPersonalizado(true);
-                            materialServicio.setDescripcion(item.getDescripcion() != null && !item.getDescripcion().isBlank() ? item.getDescripcion() : "Material");
+                            materialServicio.setDescripcion(item.getDescripcion() != null && !item.getDescripcion().isBlank() ? item.getDescripcion() : "Material personalizado");
                         }
-                    } else {
-                        materialServicio.setMaterial(null);
-                        materialServicio.setEsPersonalizado(true);
-                        materialServicio.setDescripcion(item.getDescripcion() != null && !item.getDescripcion().isBlank() ? item.getDescripcion() : "Material personalizado");
-                    }
 
-                    hoja.getMateriales().add(materialServicio);
+                        hoja.getMateriales().add(materialServicio);
+                    }
                 }
             }
-        }
 
-        HojaServicio hojaGuardada = hojaServicioRepository.saveAndFlush(hoja);
+            HojaServicio hojaGuardada = hojaServicioRepository.saveAndFlush(hoja);
 
-        orden.setHojaServicio(hojaGuardada);
-        orden.setEstado(EstadoOrden.FINALIZADA);
-        orden.setFechaFinalizacion(LocalDateTime.now());
-        orden.setFechaFin(LocalDateTime.now());
-        ordenServicioRepository.saveAndFlush(orden);
+            orden.setHojaServicio(hojaGuardada);
+            orden.setEstado(EstadoOrden.FINALIZADA);
+            orden.setFechaFinalizacion(LocalDateTime.now());
+            orden.setFechaFin(LocalDateTime.now());
+            ordenServicioRepository.saveAndFlush(orden);
 
-        return hojaGuardada;
+            return hojaGuardada;
+        });
     }
 
     /**

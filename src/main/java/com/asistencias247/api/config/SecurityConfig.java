@@ -30,10 +30,9 @@ import java.util.List;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@SuppressWarnings("null")
 public class SecurityConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
+    @Value("${app.cors.allowed-origins:https://app.24-7asistencias.com,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -48,6 +47,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/**",
+                                "/api/health",
                                 "/api/especialidades/**",
                                 "/api/materiales/**",
                                 "/v3/api-docs/**",
@@ -79,6 +79,7 @@ public class SecurityConfig {
             }
         }
         origins.addAll(List.of(
+                "https://app.24-7asistencias.com",
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
@@ -90,6 +91,8 @@ public class SecurityConfig {
         ));
         configuration.setAllowedOrigins(origins.stream().distinct().toList());
         configuration.setAllowedOriginPatterns(List.of(
+                "https://*.vercel.app",
+                "https://*.onrender.com",
                 "http://localhost:*",
                 "http://127.0.0.1:*",
                 "http://10.0.2.2:*",
