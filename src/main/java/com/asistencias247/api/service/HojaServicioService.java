@@ -1,6 +1,6 @@
 package com.asistencias247.api.service;
 
-import com.asistencias247.api.config.CloudinaryService;
+import com.asistencias247.api.service.storage.StorageService;
 import com.asistencias247.api.dto.CierreHojaServicioRequest;
 import com.asistencias247.api.dto.MaterialConsumidoDto;
 import com.asistencias247.api.entity.EstadoOrden;
@@ -31,7 +31,7 @@ public class HojaServicioService {
     private final OrdenServicioRepository ordenServicioRepository;
     private final HojaServicioRepository hojaServicioRepository;
     private final MaterialRepository materialRepository;
-    private final CloudinaryService cloudinaryService;
+    private final StorageService storageService;
     private final Executor mediaUploadExecutor;
     private final TransactionTemplate transactionTemplate;
 
@@ -39,13 +39,13 @@ public class HojaServicioService {
             OrdenServicioRepository ordenServicioRepository,
             HojaServicioRepository hojaServicioRepository,
             MaterialRepository materialRepository,
-            CloudinaryService cloudinaryService,
+            StorageService storageService,
             @Qualifier("mediaUploadExecutor") Executor mediaUploadExecutor,
             TransactionTemplate transactionTemplate) {
         this.ordenServicioRepository = ordenServicioRepository;
         this.hojaServicioRepository = hojaServicioRepository;
         this.materialRepository = materialRepository;
-        this.cloudinaryService = cloudinaryService;
+        this.storageService = storageService;
         this.mediaUploadExecutor = mediaUploadExecutor;
         this.transactionTemplate = transactionTemplate;
     }
@@ -205,9 +205,9 @@ public class HojaServicioService {
             return dato;
         }
         try {
-            return cloudinaryService.subirBase64(dato, subcarpeta);
+            return storageService.subirBase64(dato, subcarpeta);
         } catch (Exception e) {
-            log.error("Error al subir imagen a Cloudinary en subcarpeta {}: {}", subcarpeta, e.getMessage());
+            log.error("Error al subir imagen a almacenamiento en subcarpeta {}: {}", subcarpeta, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "No se pudo procesar la evidencia o firma.");
         }

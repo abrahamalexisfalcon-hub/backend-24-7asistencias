@@ -1,6 +1,6 @@
 package com.asistencias247.api.service;
 
-import com.asistencias247.api.config.CloudinaryService;
+import com.asistencias247.api.service.storage.StorageService;
 import com.asistencias247.api.dto.ActualizarEstadoTecnicoRequest;
 import com.asistencias247.api.dto.ActualizarTecnicoRequest;
 import com.asistencias247.api.dto.CrearTecnicoRequest;
@@ -30,7 +30,7 @@ public class TecnicoService {
 
     private final UsuarioRepository usuarioRepository;
     private final OrdenServicioRepository ordenServicioRepository;
-    private final CloudinaryService cloudinaryService;
+    private final StorageService storageService;
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate transactionTemplate;
 
@@ -169,14 +169,14 @@ public class TecnicoService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La firma no puede estar vacía.");
         }
 
-        // Subida externa a Cloudinary fuera de la transacción de base de datos
+        // Subida externa a almacenamiento fuera de la transacción de base de datos
         String url;
         try {
             url = (firmaBase64.startsWith("http://") || firmaBase64.startsWith("https://"))
                     ? firmaBase64
-                    : cloudinaryService.subirBase64(firmaBase64, "firmas-tecnicos");
+                    : storageService.subirBase64(firmaBase64, "firmas-tecnicos");
         } catch (Exception e) {
-            log.error("Error al subir firma de técnico a Cloudinary: {}", e.getMessage());
+            log.error("Error al subir firma de técnico a almacenamiento: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "No se pudo procesar la firma digital.");
         }
 
