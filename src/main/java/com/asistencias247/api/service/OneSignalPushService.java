@@ -21,7 +21,7 @@ public class OneSignalPushService {
     @Value("${onesignal.app-id:32237258-b02d-470e-a80c-9c57fadf03c2}")
     private String appId;
 
-    @Value("${onesignal.rest-api-key}")
+    @Value("${onesignal.rest-api-key:${ONESIGNAL_REST_API_KEY:}}")
     private String restApiKey;
 
     private final RestClient restClient = RestClient.create();
@@ -68,8 +68,7 @@ public class OneSignalPushService {
                 .retrieve()
                 .toEntity(String.class);
 
-            log.info("[OneSignal] Push enviado con éxito (Status: 200 OK)");
-            log.debug("[OneSignal] Respuesta del servidor: {}", response.getBody());
+            log.info("[OneSignal] Push enviado con éxito (Status: 200 OK) - Respuesta: {}", response.getBody());
         } catch (RestClientResponseException ex) {
             log.error("[OneSignal] Error al enviar push (Status: {}): {}", ex.getStatusCode(), ex.getResponseBodyAsString());
         } catch (Exception ex) {
