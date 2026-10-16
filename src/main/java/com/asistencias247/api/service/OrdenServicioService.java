@@ -17,9 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrdenServicioService {
@@ -28,8 +30,7 @@ public class OrdenServicioService {
     private final AfiliadoRepository afiliadoRepository;
     private final UsuarioRepository usuarioRepository;
     private final OrdenServicioMapper ordenServicioMapper;
-    private final com.asistencias247.api.service.notification.PushNotificationService pushNotificationService;
-    private final com.asistencias247.api.service.notification.NotificacionSseService notificacionSseService;
+    private final OneSignalPushService oneSignalPushService;
 
     @Transactional
     public OrdenDetalleAdminDto crearOrden(CrearOrdenRequest request) {
@@ -58,16 +59,21 @@ public class OrdenServicioService {
         OrdenDetalleAdminDto ordenDto = ordenServicioMapper.toDetalleAdmin(guardada);
 
         if (tecnico != null) {
-            // Emisión Inmediata en Tiempo Real vía Server-Sent Events (0 a 1s)
             try {
-                notificacionSseService.notificarNuevaOrden(tecnico.getId(), ordenDto);
-            } catch (Exception ignored) {
-            }
-
-            // Emisión Nativa Web Push (con pantalla bloqueada o app cerrada)
-            try {
-                pushNotificationService.enviarNotificacionNuevaOrden(tecnico.getId(), ordenDto);
-            } catch (Exception ignored) {
+                String distrito = (guardada.getAfiliado() != null && guardada.getAfiliado().getDistrito() != null)
+                        ? guardada.getAfiliado().getDistrito()
+                        : "Lima";
+                String direccion = (guardada.getAfiliado() != null && guardada.getAfiliado().getDireccion() != null && !guardada.getAfiliado().getDireccion().isBlank())
+                        ? guardada.getAfiliado().getDireccion()
+                        : distrito;
+                oneSignalPushService.enviarNotificacionAsignacion(
+                        tecnico.getId(),
+                        guardada.getCodigoOrden(),
+                        guardada.getTipoServicio(),
+                        direccion
+                );
+            } catch (Exception ex) {
+                log.error("[OneSignal] Error al disparar notificación de orden {}: {}", guardada.getCodigoOrden(), ex.getMessage());
             }
         }
 
