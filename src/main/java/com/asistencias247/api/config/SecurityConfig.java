@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/health",
                                 "/api/notificaciones/public-key",
+                                "/api/notificaciones/stream/**",
                                 "/api/especialidades/**",
                                 "/api/materiales/**",
                                 "/v3/api-docs/**",

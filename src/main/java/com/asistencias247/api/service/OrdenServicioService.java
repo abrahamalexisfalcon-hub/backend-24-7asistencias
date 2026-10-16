@@ -29,6 +29,7 @@ public class OrdenServicioService {
     private final UsuarioRepository usuarioRepository;
     private final OrdenServicioMapper ordenServicioMapper;
     private final com.asistencias247.api.service.notification.PushNotificationService pushNotificationService;
+    private final com.asistencias247.api.service.notification.NotificacionSseService notificacionSseService;
 
     @Transactional
     public OrdenDetalleAdminDto crearOrden(CrearOrdenRequest request) {
@@ -54,8 +55,16 @@ public class OrdenServicioService {
                 .build();
 
         OrdenServicio guardada = ordenServicioRepository.save(orden);
+        OrdenDetalleAdminDto ordenDto = ordenServicioMapper.toDetalleAdmin(guardada);
 
         if (tecnico != null) {
+            // Emisión Inmediata en Tiempo Real vía Server-Sent Events (0 a 1s)
+            try {
+                notificacionSseService.notificarNuevaOrden(tecnico.getId(), ordenDto);
+            } catch (Exception ignored) {
+            }
+
+            // Emisión Nativa Web Push (con pantalla bloqueada o app cerrada)
             try {
                 pushNotificationService.enviarNotificacionANativo(
                         tecnico.getId(),
@@ -67,7 +76,7 @@ public class OrdenServicioService {
             }
         }
 
-        return ordenServicioMapper.toDetalleAdmin(guardada);
+        return ordenDto;
     }
 
     @Transactional(readOnly = true)
