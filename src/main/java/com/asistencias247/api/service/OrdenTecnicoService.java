@@ -101,11 +101,13 @@ public class OrdenTecnicoService {
     }
 
     private OrdenResumenTecnicoDto convertirAResumenDto(OrdenServicio orden) {
-        String fechaProg = orden.getFechaAsignacion() != null
-                ? "Hoy, " + orden.getFechaAsignacion().toLocalTime().toString().substring(0, 5)
-                : "Hoy, 10:30 AM";
+        java.time.LocalDateTime fechaBase = orden.getFechaAsignacion() != null
+                ? orden.getFechaAsignacion()
+                : (orden.getFechaCreacion() != null ? orden.getFechaCreacion() : java.time.LocalDateTime.now());
+        String fechaIso = fechaBase.toString();
+
         String horaLleg = orden.getFechaLlegada() != null
-                ? orden.getFechaLlegada().toLocalTime().toString().substring(0, 5) + " AM"
+                ? orden.getFechaLlegada().toString()
                 : null;
 
         String tecNombre = orden.getTecnico() != null ? orden.getTecnico().getNombreCompleto() : null;
@@ -160,7 +162,9 @@ public class OrdenTecnicoService {
                 .distrito(distAfiliado)
                 .dniAfiliado(dniAfiliado)
                 .codigoCuenta(ctaAfiliado)
-                .fechaProgramada(fechaProg)
+                .fechaProgramada(fechaIso)
+                .fechaCreacion(fechaIso)
+                .fechaAsignacion(orden.getFechaAsignacion() != null ? orden.getFechaAsignacion().toString() : fechaIso)
                 .horaLlegada(horaLleg)
                 .tecnicoNombre(tecNombre)
                 .tecnicoFirmaUrl(tecFirmaUrl)

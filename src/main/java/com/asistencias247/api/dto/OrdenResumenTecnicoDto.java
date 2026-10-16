@@ -21,6 +21,8 @@ public class OrdenResumenTecnicoDto {
     private String dniAfiliado;
     private String codigoCuenta;
     private String fechaProgramada;
+    private String fechaCreacion;
+    private String fechaAsignacion;
     private String horaLlegada;
     private String tecnicoNombre;
     private String tecnicoFirmaUrl;

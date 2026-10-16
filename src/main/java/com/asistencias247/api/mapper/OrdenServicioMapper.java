@@ -62,9 +62,12 @@ public class OrdenServicioMapper {
                     .tecnico(toTecnicoInfoAdminDto(tec));
         }
 
-        if (orden.getFechaAsignacion() != null) {
-            builder.fechaCreacion(orden.getFechaAsignacion().toString());
-            builder.fechaProgramada(orden.getFechaAsignacion().toString());
+        java.time.LocalDateTime fechaBase = orden.getFechaCreacion() != null 
+                ? orden.getFechaCreacion() 
+                : orden.getFechaAsignacion();
+        if (fechaBase != null) {
+            builder.fechaCreacion(fechaBase.toString());
+            builder.fechaProgramada(fechaBase.toString());
         }
 
         if (orden.getHojaServicio() != null) {

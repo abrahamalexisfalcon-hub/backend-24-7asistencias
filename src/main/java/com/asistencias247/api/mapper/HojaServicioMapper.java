@@ -21,10 +21,13 @@ public class HojaServicioMapper {
 
         List<String> fotos = new ArrayList<>();
         if (hoja.getFotoInicialUrl() != null && !hoja.getFotoInicialUrl().isBlank()) {
-            fotos.add(hoja.getFotoInicialUrl());
+            fotos.add(hoja.getFotoInicialUrl().trim());
         }
         if (hoja.getFotoFinalUrl() != null && !hoja.getFotoFinalUrl().isBlank()) {
-            fotos.add(hoja.getFotoFinalUrl());
+            String finalUrl = hoja.getFotoFinalUrl().trim();
+            if (!fotos.contains(finalUrl)) {
+                fotos.add(finalUrl);
+            }
         }
 
         return CierreHojaServicioResponseDto.builder()

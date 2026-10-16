@@ -37,6 +37,10 @@ public class OrdenServicio {
     @JoinColumn(name = "tecnico_id")
     private Usuario tecnico;
 
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "fecha_creacion", updatable = false)
+    private LocalDateTime fechaCreacion;
+
     @Column(name = "fecha_asignacion")
     private LocalDateTime fechaAsignacion;
 
@@ -61,5 +65,9 @@ public class OrdenServicio {
 
     public void setFechaFin(LocalDateTime fechaFin) {
         this.fechaFinalizacion = fechaFin;
+    }
+
+    public LocalDateTime getFechaCreacion() {
+        return this.fechaCreacion != null ? this.fechaCreacion : this.fechaAsignacion;
     }
 }

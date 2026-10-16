@@ -28,6 +28,7 @@ public class OrdenServicioService {
     private final AfiliadoRepository afiliadoRepository;
     private final UsuarioRepository usuarioRepository;
     private final OrdenServicioMapper ordenServicioMapper;
+    private final com.asistencias247.api.service.notification.PushNotificationService pushNotificationService;
 
     @Transactional
     public OrdenDetalleAdminDto crearOrden(CrearOrdenRequest request) {
@@ -53,6 +54,19 @@ public class OrdenServicioService {
                 .build();
 
         OrdenServicio guardada = ordenServicioRepository.save(orden);
+
+        if (tecnico != null) {
+            try {
+                pushNotificationService.enviarNotificacionANativo(
+                        tecnico.getId(),
+                        "¡Nueva Orden Asignada! #" + guardada.getCodigoOrden(),
+                        "Tienes un nuevo servicio de " + guardada.getTipoServicio() + " asignado.",
+                        "/tecnico/ordenes"
+                );
+            } catch (Exception ignored) {
+            }
+        }
+
         return ordenServicioMapper.toDetalleAdmin(guardada);
     }
 
