@@ -18,10 +18,10 @@ import java.util.Optional;
 public interface OrdenServicioRepository extends JpaRepository<OrdenServicio, Long> {
 
     @Override
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
     Optional<OrdenServicio> findById(Long id);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
     Optional<OrdenServicio> findByCodigoOrden(String codigoOrden);
 
     @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})

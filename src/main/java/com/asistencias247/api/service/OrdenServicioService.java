@@ -71,6 +71,8 @@ public class OrdenServicioService implements IOrdenServicioService {
 
     private void notificarAsignacionTecnico(OrdenServicio orden) {
         if (orden.getTecnico() == null) {
+            log.warn("[OneSignal-TRACE] Orden ID: {} (#{}) creada sin técnico asignado. Se omite envío de push.",
+                    orden.getId(), orden.getCodigoOrden());
             return;
         }
         try {
@@ -81,13 +83,14 @@ public class OrdenServicioService implements IOrdenServicioService {
                     ? orden.getAfiliado().getDireccion()
                     : distrito;
             oneSignalPushService.enviarNotificacionAsignacion(
+                    orden.getId(),
                     orden.getTecnico().getId(),
                     orden.getCodigoOrden(),
                     orden.getTipoServicio(),
                     direccion
             );
         } catch (Exception ex) {
-            log.error("[OneSignal] Error al disparar notificación de orden {}: {}", orden.getCodigoOrden(), ex.getMessage());
+            log.error("[OneSignal-ERROR] Error al disparar notificación de orden {}: {}", orden.getCodigoOrden(), ex.getMessage(), ex);
         }
     }
 

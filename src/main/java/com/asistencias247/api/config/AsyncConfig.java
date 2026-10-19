@@ -1,15 +1,19 @@
 package com.asistencias247.api.config;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
+@Slf4j
 @Configuration
 @EnableAsync
-public class AsyncConfig {
+public class AsyncConfig implements AsyncConfigurer {
 
     /**
      * Pool de subprocesos optimizado para entornos de recursos reducidos (512 MB RAM / 1 Core en Render).
@@ -26,5 +30,20 @@ public class AsyncConfig {
         executor.setAwaitTerminationSeconds(20);
         executor.initialize();
         return executor;
+    }
+
+    @Override
+    public Executor getAsyncExecutor() {
+        return mediaUploadExecutor();
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (ex, method, params) -> log.error(
+                "[Async-ERROR] Excepción no controlada en tarea asíncrona '{}': {}",
+                method.getName(),
+                ex.getMessage(),
+                ex
+        );
     }
 }

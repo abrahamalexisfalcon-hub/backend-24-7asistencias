@@ -5,6 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "materiales")
+@org.hibernate.annotations.BatchSize(size = 50)
 @Getter
 @Setter
 @NoArgsConstructor

@@ -1,6 +1,7 @@
 package com.asistencias247.api.repository;
 
 import com.asistencias247.api.entity.Material;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,10 @@ public interface MaterialRepository extends JpaRepository<Material, Long> {
     @Override
     @EntityGraph(attributePaths = {"especialidad"})
     Optional<Material> findById(Long id);
+
+    @Override
+    @EntityGraph(attributePaths = {"especialidad"})
+    List<Material> findAll(Sort sort);
 
     @EntityGraph(attributePaths = {"especialidad"})
     List<Material> findByActivoTrueOrderByNombreAsc();

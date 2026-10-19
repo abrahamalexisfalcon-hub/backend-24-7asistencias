@@ -52,6 +52,7 @@ public class HojaServicio {
     private String pdfActaUrl;
 
     @OneToMany(mappedBy = "hojaServicio", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
     @Builder.Default
     private List<MaterialServicio> materiales = new ArrayList<>();
 }

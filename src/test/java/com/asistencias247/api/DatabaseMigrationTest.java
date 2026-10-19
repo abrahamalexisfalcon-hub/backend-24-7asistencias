@@ -1,21 +1,25 @@
 package com.asistencias247.api;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+
 import static org.junit.jupiter.api.Assertions.*;
 
+@SpringBootTest
 public class DatabaseMigrationTest {
 
-    private static final String DB_URL = "jdbc:postgresql://ep-mute-forest-b524iw2m-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require";
-    private static final String DB_USER = "neondb_owner";
-    private static final String DB_PASS = "npg_ULx8Sau6kGsB";
+    @Autowired
+    private DataSource dataSource;
 
     @Test
     void verifyCatalogoMaterialesIsEliminatedAndMaterialesServicioPointsToMateriales() throws Exception {
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+        try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
 
             // 1. catalogo_materiales NO debe existir
@@ -35,3 +39,4 @@ public class DatabaseMigrationTest {
         }
     }
 }
+
