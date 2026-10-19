@@ -1,7 +1,9 @@
 package com.asistencias247.api.controller;
 
+import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.OrdenResumenTecnicoDto;
-import com.asistencias247.api.service.OrdenTecnicoService;
+import com.asistencias247.api.service.IOrdenTecnicoService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,7 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrdenTecnicoController {
 
-    private final OrdenTecnicoService ordenTecnicoService;
+    private final IOrdenTecnicoService ordenTecnicoService;
 
     @GetMapping
     public ResponseEntity<List<OrdenResumenTecnicoDto>> obtenerOrdenes(
@@ -70,6 +72,15 @@ public class OrdenTecnicoController {
     public ResponseEntity<OrdenResumenTecnicoDto> registrarLlegada(@PathVariable Long ordenId) {
         OrdenResumenTecnicoDto ordenActualizada = ordenTecnicoService.registrarLlegada(ordenId);
         return ResponseEntity.ok(ordenActualizada);
+    }
+
+    @RequestMapping(value = {"/{ordenId}/asistido-no-realizado", "/{ordenId}/cancelar"}, method = {RequestMethod.POST, RequestMethod.PATCH})
+    public ResponseEntity<OrdenResumenTecnicoDto> registrarAsistidoNoRealizado(
+            @PathVariable Long ordenId,
+            @Valid @RequestBody(required = false) CancelarOrdenRequest request) {
+        String motivo = request != null ? request.getMotivoEfectivo() : "";
+        OrdenResumenTecnicoDto ordenCancelada = ordenTecnicoService.registrarAsistidoNoRealizado(ordenId, motivo);
+        return ResponseEntity.ok(ordenCancelada);
     }
 
     @GetMapping("/detalle/{ordenId}")

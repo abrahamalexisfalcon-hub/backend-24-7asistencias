@@ -4,9 +4,12 @@ import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.entity.EstadoOrden;
-import com.asistencias247.api.service.OrdenServicioService;
+import com.asistencias247.api.service.IOrdenServicioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminOrdenController {
 
-    private final OrdenServicioService ordenServicioService;
+    private final IOrdenServicioService ordenServicioService;
 
     @PostMapping
     public ResponseEntity<OrdenDetalleAdminDto> crearOrden(@Valid @RequestBody CrearOrdenRequest request) {
@@ -33,6 +36,14 @@ public class AdminOrdenController {
         return ResponseEntity.ok(ordenes);
     }
 
+    @GetMapping("/paginadas")
+    public ResponseEntity<Page<OrdenDetalleAdminDto>> listarOrdenesPaginadas(
+            @RequestParam(required = false) EstadoOrden estado,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Page<OrdenDetalleAdminDto> pagina = ordenServicioService.listarOrdenesPaginadas(estado, pageable);
+        return ResponseEntity.ok(pagina);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<OrdenDetalleAdminDto> obtenerDetalleOrden(@PathVariable Long id) {
         OrdenDetalleAdminDto detalle = ordenServicioService.obtenerDetalle(id);
@@ -42,9 +53,17 @@ public class AdminOrdenController {
     @RequestMapping(value = "/{id}/cancelar", method = {RequestMethod.PATCH, RequestMethod.POST})
     public ResponseEntity<OrdenDetalleAdminDto> cancelarOrden(
             @PathVariable Long id,
-            @RequestBody(required = false) CancelarOrdenRequest request) {
+            @Valid @RequestBody(required = false) CancelarOrdenRequest request) {
         OrdenDetalleAdminDto cancelada = ordenServicioService.cancelarOrden(id, request);
         return ResponseEntity.ok(cancelada);
+    }
+
+    @RequestMapping(value = "/{id}/observacion-cancelacion", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    public ResponseEntity<OrdenDetalleAdminDto> actualizarObservacionCancelacion(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelarOrdenRequest request) {
+        OrdenDetalleAdminDto actualizada = ordenServicioService.actualizarObservacionCancelacion(id, request);
+        return ResponseEntity.ok(actualizada);
     }
 
     @DeleteMapping("/{id}")

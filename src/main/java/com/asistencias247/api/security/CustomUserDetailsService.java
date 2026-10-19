@@ -1,5 +1,6 @@
 package com.asistencias247.api.security;
 
+import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +25,11 @@ public class CustomUserDetailsService implements UserDetailsService {
         Usuario usuario = usuarioRepository.findByCorreo(correo)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con correo: " + correo));
 
-        SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + usuario.getRol().name());
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().name()));
+        if (usuario.getRol() == RolUsuario.ADMINISTRADOR) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
 
         return new User(
                 usuario.getCorreo(),
@@ -32,7 +38,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 true,
                 true,
                 true,
-                Collections.singletonList(authority)
+                authorities
         );
     }
 }

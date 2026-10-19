@@ -6,25 +6,30 @@ import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.entity.Afiliado;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
+import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.mapper.OrdenServicioMapper;
 import com.asistencias247.api.repository.AfiliadoRepository;
 import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OrdenServicioService {
+public class OrdenServicioService implements IOrdenServicioService {
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final AfiliadoRepository afiliadoRepository;
@@ -32,6 +37,7 @@ public class OrdenServicioService {
     private final OrdenServicioMapper ordenServicioMapper;
     private final OneSignalPushService oneSignalPushService;
 
+    @Override
     @Transactional
     public OrdenDetalleAdminDto crearOrden(CrearOrdenRequest request) {
         Afiliado afiliado = afiliadoRepository.findById(request.getAfiliadoId())
@@ -58,28 +64,34 @@ public class OrdenServicioService {
         OrdenServicio guardada = ordenServicioRepository.save(orden);
         OrdenDetalleAdminDto ordenDto = ordenServicioMapper.toDetalleAdmin(guardada);
 
-        if (tecnico != null) {
-            try {
-                String distrito = (guardada.getAfiliado() != null && guardada.getAfiliado().getDistrito() != null)
-                        ? guardada.getAfiliado().getDistrito()
-                        : "Lima";
-                String direccion = (guardada.getAfiliado() != null && guardada.getAfiliado().getDireccion() != null && !guardada.getAfiliado().getDireccion().isBlank())
-                        ? guardada.getAfiliado().getDireccion()
-                        : distrito;
-                oneSignalPushService.enviarNotificacionAsignacion(
-                        tecnico.getId(),
-                        guardada.getCodigoOrden(),
-                        guardada.getTipoServicio(),
-                        direccion
-                );
-            } catch (Exception ex) {
-                log.error("[OneSignal] Error al disparar notificación de orden {}: {}", guardada.getCodigoOrden(), ex.getMessage());
-            }
-        }
+        notificarAsignacionTecnico(guardada);
 
         return ordenDto;
     }
 
+    private void notificarAsignacionTecnico(OrdenServicio orden) {
+        if (orden.getTecnico() == null) {
+            return;
+        }
+        try {
+            String distrito = (orden.getAfiliado() != null && orden.getAfiliado().getDistrito() != null)
+                    ? orden.getAfiliado().getDistrito()
+                    : "Lima";
+            String direccion = (orden.getAfiliado() != null && orden.getAfiliado().getDireccion() != null && !orden.getAfiliado().getDireccion().isBlank())
+                    ? orden.getAfiliado().getDireccion()
+                    : distrito;
+            oneSignalPushService.enviarNotificacionAsignacion(
+                    orden.getTecnico().getId(),
+                    orden.getCodigoOrden(),
+                    orden.getTipoServicio(),
+                    direccion
+            );
+        } catch (Exception ex) {
+            log.error("[OneSignal] Error al disparar notificación de orden {}: {}", orden.getCodigoOrden(), ex.getMessage());
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenDetalleAdminDto> listarOrdenes(EstadoOrden estado) {
         List<OrdenServicio> ordenes = (estado != null)
@@ -91,6 +103,17 @@ public class OrdenServicioService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrdenDetalleAdminDto> listarOrdenesPaginadas(EstadoOrden estado, Pageable pageable) {
+        Page<OrdenServicio> pagina = (estado != null)
+                ? ordenServicioRepository.findByEstadoOrderByFechaAsignacionDesc(estado, pageable)
+                : ordenServicioRepository.findAllByOrderByFechaAsignacionDesc(pageable);
+
+        return pagina.map(ordenServicioMapper::toDetalleAdmin);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public OrdenDetalleAdminDto obtenerDetalle(Long id) {
         OrdenServicio orden = ordenServicioRepository.findById(id)
@@ -99,12 +122,13 @@ public class OrdenServicioService {
         return ordenServicioMapper.toDetalleAdmin(orden);
     }
 
+    @Override
     @Transactional
     public OrdenDetalleAdminDto cancelarOrden(Long id, CancelarOrdenRequest request) {
         OrdenServicio orden = ordenServicioRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden de servicio no encontrada con ID: " + id));
 
-        if (orden.getEstado() == EstadoOrden.FINALIZADA) {
+        if (!orden.getEstado().esCancelable()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se puede anular una orden con Hoja de Servicio finalizada y firmada");
         }
 
@@ -121,6 +145,68 @@ public class OrdenServicioService {
         return ordenServicioMapper.toDetalleAdmin(guardada);
     }
 
+    @Override
+    @Transactional
+    public OrdenServicio marcarAsistidoNoRealizado(Long id, String motivo) {
+        OrdenServicio orden = ordenServicioRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden de servicio no encontrada con ID: " + id));
+
+        validarPropiedadOrdenSiEsTecnico(orden);
+
+        if (!orden.getEstado().esCancelable()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se puede anular una orden ya finalizada");
+        }
+
+        String motivoLimpio = motivo != null ? motivo.trim() : "";
+        if (motivoLimpio.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El motivo es obligatorio");
+        }
+
+        orden.setEstado(EstadoOrden.CANCELADA);
+        orden.setMotivoCancelacion(motivoLimpio);
+        orden.setFechaCancelacion(LocalDateTime.now());
+
+        return ordenServicioRepository.save(orden);
+    }
+
+    @Override
+    @Transactional
+    public OrdenDetalleAdminDto actualizarObservacionCancelacion(Long id, CancelarOrdenRequest request) {
+        OrdenServicio orden = ordenServicioRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden de servicio no encontrada con ID: " + id));
+
+        String observacion = (request != null) ? request.getMotivoEfectivo() : "";
+        if (observacion.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La observación no puede estar vacía");
+        }
+
+        orden.setMotivoCancelacion(observacion);
+        if (orden.getFechaCancelacion() == null) {
+            orden.setFechaCancelacion(LocalDateTime.now());
+        }
+
+        OrdenServicio guardada = ordenServicioRepository.save(orden);
+        return ordenServicioMapper.toDetalleAdmin(guardada);
+    }
+
+    private void validarPropiedadOrdenSiEsTecnico(OrdenServicio orden) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return;
+        }
+        String correoAutenticado = auth.getName();
+        if (correoAutenticado == null || correoAutenticado.isBlank()) {
+            return;
+        }
+        Usuario usuario = usuarioRepository.findByCorreo(correoAutenticado).orElse(null);
+        if (usuario != null && usuario.getRol() == RolUsuario.TECNICO) {
+            if (orden.getTecnico() != null && !orden.getTecnico().getId().equals(usuario.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para modificar una orden asignada a otro técnico");
+            }
+        }
+    }
+
+    @Override
     public synchronized String generarCorrelativoAnual(int anio) {
         long totalEnAnio = ordenServicioRepository.countByAnioAsignacion(anio);
         long siguiente = totalEnAnio + 1;
@@ -134,6 +220,7 @@ public class OrdenServicioService {
         return codigoGenerado;
     }
 
+    @Override
     @Transactional
     public void eliminarOrden(Long id) {
         ordenServicioRepository.deleteById(id);

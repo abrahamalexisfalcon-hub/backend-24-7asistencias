@@ -20,7 +20,7 @@ public class JwtService {
     @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
     private String secretKey;
 
-    @Value("${jwt.expiration:86400000}")
+    @Value("${jwt.expiration:36000000}")
     private long jwtExpiration;
 
     public String generateToken(UserDetails userDetails, Long usuarioId, String rol) {

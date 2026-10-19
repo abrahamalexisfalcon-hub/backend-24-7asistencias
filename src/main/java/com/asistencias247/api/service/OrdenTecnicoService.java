@@ -3,11 +3,14 @@ package com.asistencias247.api.service;
 import com.asistencias247.api.dto.OrdenResumenTecnicoDto;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
+import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,19 +20,22 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class OrdenTecnicoService {
+public class OrdenTecnicoService implements IOrdenTecnicoService {
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final UsuarioRepository usuarioRepository;
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerOrdenesPorTecnico(Long tecnicoId) {
-        return ordenServicioRepository.findByTecnicoIdOrderByFechaAsignacionDesc(tecnicoId)
+        Long idEfectivo = resolverTecnicoIdAutorizado(tecnicoId);
+        return ordenServicioRepository.findByTecnicoIdOrderByFechaAsignacionDesc(idEfectivo)
                 .stream()
                 .map(this::convertirAResumenDto)
                 .toList();
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerOrdenesPorCorreo(String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo).orElse(null);
@@ -39,14 +45,17 @@ public class OrdenTecnicoService {
         return obtenerOrdenesPorTecnico(usuario.getId());
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerAsignadas(Long tecnicoId) {
-        return ordenServicioRepository.findByTecnicoIdAndEstadoNotOrderByFechaAsignacionDesc(tecnicoId, EstadoOrden.FINALIZADA)
+        Long idEfectivo = resolverTecnicoIdAutorizado(tecnicoId);
+        return ordenServicioRepository.findByTecnicoIdAndEstadoNotOrderByFechaAsignacionDesc(idEfectivo, EstadoOrden.FINALIZADA)
                 .stream()
                 .map(this::convertirAResumenDto)
                 .toList();
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerAsignadasPorCorreo(String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo).orElse(null);
@@ -56,14 +65,17 @@ public class OrdenTecnicoService {
         return obtenerAsignadas(usuario.getId());
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerHistorial(Long tecnicoId) {
-        return ordenServicioRepository.findByTecnicoIdAndEstadoOrderByFechaAsignacionDesc(tecnicoId, EstadoOrden.FINALIZADA)
+        Long idEfectivo = resolverTecnicoIdAutorizado(tecnicoId);
+        return ordenServicioRepository.findByTecnicoIdAndEstadoOrderByFechaAsignacionDesc(idEfectivo, EstadoOrden.FINALIZADA)
                 .stream()
                 .map(this::convertirAResumenDto)
                 .toList();
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerHistorialPorCorreo(String correo) {
         Usuario usuario = usuarioRepository.findByCorreo(correo).orElse(null);
@@ -73,6 +85,7 @@ public class OrdenTecnicoService {
         return obtenerHistorial(usuario.getId());
     }
 
+    @Override
     @Transactional(readOnly = true)
     public List<OrdenResumenTecnicoDto> obtenerTodasLasOrdenes() {
         return ordenServicioRepository.findAllByOrderByFechaAsignacionDesc()
@@ -81,10 +94,17 @@ public class OrdenTecnicoService {
                 .toList();
     }
 
+    @Override
     @Transactional
     public OrdenResumenTecnicoDto registrarLlegada(Long ordenId) {
         OrdenServicio orden = ordenServicioRepository.findById(ordenId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId));
+
+        validarPropiedadOrdenSiEsTecnico(orden);
+
+        if (!orden.getEstado().puedeTransicionarA(EstadoOrden.EN_DOMICILIO)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La orden no puede pasar al estado EN_DOMICILIO desde su estado actual");
+        }
 
         orden.setEstado(EstadoOrden.EN_DOMICILIO);
         orden.setFechaLlegada(LocalDateTime.now());
@@ -93,11 +113,62 @@ public class OrdenTecnicoService {
         return convertirAResumenDto(ordenActualizada);
     }
 
+    @Override
+    @Transactional
+    public OrdenResumenTecnicoDto registrarAsistidoNoRealizado(Long ordenId, String motivo) {
+        OrdenServicio orden = ordenServicioRepository.findById(ordenId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId));
+
+        validarPropiedadOrdenSiEsTecnico(orden);
+
+        if (!orden.getEstado().esCancelable()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se puede anular una orden ya finalizada");
+        }
+
+        String motivoLimpio = motivo != null ? motivo.trim() : "";
+        if (motivoLimpio.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes indicar el motivo por el cual no se realizó el servicio");
+        }
+
+        orden.setEstado(EstadoOrden.CANCELADA);
+        orden.setMotivoCancelacion(motivoLimpio);
+        orden.setFechaCancelacion(LocalDateTime.now());
+        OrdenServicio ordenActualizada = ordenServicioRepository.save(orden);
+
+        return convertirAResumenDto(ordenActualizada);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public OrdenResumenTecnicoDto obtenerDetalleOrden(Long ordenId) {
         OrdenServicio orden = ordenServicioRepository.findById(ordenId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId));
+        validarPropiedadOrdenSiEsTecnico(orden);
         return convertirAResumenDto(orden);
+    }
+
+    private Long resolverTecnicoIdAutorizado(Long tecnicoIdSolicitado) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getName() != null) {
+            Usuario autenticado = usuarioRepository.findByCorreo(auth.getName()).orElse(null);
+            if (autenticado != null && autenticado.getRol() == RolUsuario.TECNICO) {
+                return autenticado.getId();
+            }
+        }
+        return tecnicoIdSolicitado;
+    }
+
+    private void validarPropiedadOrdenSiEsTecnico(OrdenServicio orden) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
+            return;
+        }
+        Usuario autenticado = usuarioRepository.findByCorreo(auth.getName()).orElse(null);
+        if (autenticado != null && autenticado.getRol() == RolUsuario.TECNICO) {
+            if (orden.getTecnico() != null && !orden.getTecnico().getId().equals(autenticado.getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permiso para acceder o modificar una orden asignada a otro técnico");
+            }
+        }
     }
 
     private OrdenResumenTecnicoDto convertirAResumenDto(OrdenServicio orden) {
@@ -179,6 +250,8 @@ public class OrdenTecnicoService {
                 .fotosEvidencia(fotosEvidencia)
                 .hojaServicioId(hojaServicioId)
                 .materiales(mats)
+                .motivoCancelacion(orden.getMotivoCancelacion())
+                .fechaCancelacion(orden.getFechaCancelacion() != null ? orden.getFechaCancelacion().toString() : null)
                 .build();
     }
 }

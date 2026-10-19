@@ -37,5 +37,8 @@ public class OrdenResumenTecnicoDto {
     private java.util.List<String> fotosEvidencia;
     private Long hojaServicioId;
     private java.util.List<MaterialConsumidoDto> materiales;
+    private String motivoCancelacion;
+    private String fechaCancelacion;
 }
+
 
