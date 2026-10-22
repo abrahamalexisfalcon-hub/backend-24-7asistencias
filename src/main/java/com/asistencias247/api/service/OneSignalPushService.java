@@ -93,8 +93,7 @@ public class OneSignalPushService {
         String detalleDireccion = (direccion != null && !direccion.isBlank()) ? direccion : "Lima";
         String contenido = (tipoServicio != null ? tipoServicio : "Servicio") + " • " + detalleDireccion;
 
-        // OneSignal requiere clave 'en' como idioma predeterminado/fallback obligatorio
-        Map<String, Object> payload = Map.of(
+        Map<String, Object> payloadPorAlias = Map.of(
             "app_id", appId.trim(),
             "include_aliases", Map.of("external_id", List.of(String.valueOf(tecnicoId))),
             "target_channel", "push",
@@ -112,17 +111,49 @@ public class OneSignalPushService {
                 .uri("https://onesignal.com/api/v1/notifications")
                 .header(HttpHeaders.AUTHORIZATION, authHeader)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
+                .body(payloadPorAlias)
                 .retrieve()
                 .toEntity(String.class);
 
-            log.info("[OneSignal-RESPONSE] Status code: {}", response.getStatusCode());
-            log.info("[OneSignal-RESPONSE] Body: {}", response.getBody());
+            String responseBody = response.getBody() != null ? response.getBody() : "";
+            log.info("[OneSignal-RESPONSE] Status code: {} | Body: {}", response.getStatusCode(), responseBody);
+
+            // Si el external_id del técnico no tiene suscripción activa vinculada (id vacío o errors en body),
+            // ejecutar respaldo automático hacia "Subscribed Users" para garantizar entrega en dispositivos activos
+            if (responseBody.contains("\"id\":\"\"") || responseBody.contains("\"errors\"")) {
+                log.warn("[OneSignal-FALLBACK] El external_id={} no tenía suscripciones vinculadas directas. Enviando push por segmento 'Subscribed Users'...", tecnicoId);
+                enviarFallbackSuscritos(authHeader, titulo, contenido);
+            }
         } catch (RestClientResponseException ex) {
-            log.error("[OneSignal-RESPONSE] Status code: {}", ex.getStatusCode());
-            log.error("[OneSignal-RESPONSE] Body: {}", ex.getResponseBodyAsString());
+            log.error("[OneSignal-RESPONSE] Status code: {} | Body: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            enviarFallbackSuscritos(authHeader, titulo, contenido);
         } catch (Exception ex) {
             log.error("[OneSignal-ERROR] Error inesperado al enviar notificación push: {}", ex.getMessage(), ex);
+        }
+    }
+
+    private void enviarFallbackSuscritos(String authHeader, String titulo, String contenido) {
+        try {
+            Map<String, Object> fallbackPayload = Map.of(
+                "app_id", appId.trim(),
+                "included_segments", List.of("Subscribed Users"),
+                "target_channel", "push",
+                "headings", Map.of("en", titulo, "es", titulo),
+                "contents", Map.of("en", contenido, "es", contenido),
+                "url", "https://app.24-7asistencias.com/tecnico"
+            );
+
+            var fallbackRes = restClient.post()
+                .uri("https://onesignal.com/api/v1/notifications")
+                .header(HttpHeaders.AUTHORIZATION, authHeader)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(fallbackPayload)
+                .retrieve()
+                .toEntity(String.class);
+
+            log.info("[OneSignal-FALLBACK-RESPONSE] Status code: {} | Body: {}", fallbackRes.getStatusCode(), fallbackRes.getBody());
+        } catch (Exception e) {
+            log.error("[OneSignal-FALLBACK-ERROR] Falló el envío de respaldo a Subscribed Users: {}", e.getMessage());
         }
     }
 }
