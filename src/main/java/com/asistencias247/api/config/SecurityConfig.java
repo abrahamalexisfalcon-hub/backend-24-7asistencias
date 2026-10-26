@@ -80,6 +80,7 @@ public class SecurityConfig {
         }
         origins.addAll(List.of(
                 "https://app.24-7asistencias.com",
+                "http://179.197.81.227",
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
@@ -93,6 +94,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
                 "https://*.vercel.app",
                 "https://*.onrender.com",
+                "http://179.197.81.227*",
                 "http://localhost:*",
                 "http://127.0.0.1:*",
                 "http://10.0.2.2:*",
