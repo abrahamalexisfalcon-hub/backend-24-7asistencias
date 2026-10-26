@@ -80,6 +80,8 @@ public class SecurityConfig {
         }
         origins.addAll(List.of(
                 "https://app.24-7asistencias.com",
+                "http://app.24-7asistencias.com",
+                "https://179.197.81.227",
                 "http://179.197.81.227",
                 "http://localhost:3000",
                 "http://localhost:5173",
