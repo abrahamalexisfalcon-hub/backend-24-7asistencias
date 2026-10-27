@@ -120,6 +120,16 @@ public class TecnicoService {
         if (request.getNombreCompleto() != null && !request.getNombreCompleto().isBlank()) {
             tecnico.setNombreCompleto(request.getNombreCompleto().trim());
         }
+        if (request.getCorreo() != null && !request.getCorreo().isBlank()) {
+            String correoLimpio = request.getCorreo().trim().toLowerCase();
+            if (!correoLimpio.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El formato del correo electrónico no es válido.");
+            }
+            if (usuarioRepository.existsByCorreoIgnoreCaseAndIdNot(correoLimpio, id)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otro usuario registrado con el correo: " + correoLimpio);
+            }
+            tecnico.setCorreo(correoLimpio);
+        }
         if (request.getTelefono() != null && !request.getTelefono().isBlank()) {
             String telLimpio = request.getTelefono().replaceAll("\\D", "");
             if (telLimpio.length() < 9) {

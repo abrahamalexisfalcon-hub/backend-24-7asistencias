@@ -10,6 +10,7 @@ import lombok.*;
 public class ActualizarTecnicoRequest {
 
     private String nombreCompleto;
+    private String correo;
     private String telefono;
     private String especialidad;
     private String password;
