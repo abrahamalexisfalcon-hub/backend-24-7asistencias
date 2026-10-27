@@ -134,6 +134,42 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponseDto> handleDataIntegrityViolationException(
+            org.springframework.dao.DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+
+        String rawMessage = ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage()
+                : ex.getMessage();
+        String lowerMsg = rawMessage != null ? rawMessage.toLowerCase() : "";
+
+        String mensajeAmigable = "Conflicto de integridad: el registro que intenta guardar contiene un valor duplicado.";
+        if (rawMessage != null && (rawMessage.startsWith("El Número de Caso") || rawMessage.startsWith("El Número de OT"))) {
+            mensajeAmigable = rawMessage;
+        } else if (lowerMsg.contains("numero_caso")) {
+            mensajeAmigable = "El Número de Caso ingresado ya existe en la base de datos. Por favor verifique e ingrese uno distinto.";
+        } else if (lowerMsg.contains("numero_ot")) {
+            mensajeAmigable = "El Número de OT ingresado ya existe en la base de datos. Por favor verifique e ingrese uno distinto.";
+        } else if (lowerMsg.contains("cuentas") || lowerMsg.contains("cuenta")) {
+            mensajeAmigable = "Ya existe una cuenta o aseguradora registrada con ese nombre.";
+        } else if (lowerMsg.contains("dni")) {
+            mensajeAmigable = "Ya existe un afiliado registrado con ese número de DNI.";
+        } else if (lowerMsg.contains("correo")) {
+            mensajeAmigable = "Ya existe un usuario registrado con ese correo electrónico.";
+        }
+
+        ErrorResponseDto errorResponse = ErrorResponseDto.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(mensajeAmigable)
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponseDto> handleResponseStatusException(
             ResponseStatusException ex,

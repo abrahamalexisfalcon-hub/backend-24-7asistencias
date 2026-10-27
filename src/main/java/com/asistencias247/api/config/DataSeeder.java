@@ -1,7 +1,9 @@
 package com.asistencias247.api.config;
 
+import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
+import com.asistencias247.api.repository.CuentaRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,12 +12,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
+    private final CuentaRepository cuentaRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -69,6 +74,23 @@ public class DataSeeder implements CommandLineRunner {
                 log.info("Firma digital base asociada al técnico tecnico@asistencias247.com");
             }
         });
+
+        if (cuentaRepository.count() == 0) {
+            List<String> cuentasBase = List.of(
+                    "Rímac Seguros",
+                    "Pacífico Seguros",
+                    "Mapfre",
+                    "La Positiva",
+                    "Interseguro"
+            );
+            for (String nombre : cuentasBase) {
+                cuentaRepository.save(Cuenta.builder()
+                        .nombre(nombre)
+                        .activo(true)
+                        .build());
+            }
+            log.info("Cuentas aseguradoras iniciales registradas: {}", cuentasBase);
+        }
 
         log.info("Inicialización completada. No se generan datos simulados ni de prueba (modo base de datos en limpio).");
     }

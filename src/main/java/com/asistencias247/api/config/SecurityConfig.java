@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/health",
                                 "/api/especialidades/**",
+                                "/api/cuentas/**",
                                 "/api/materiales/**",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",

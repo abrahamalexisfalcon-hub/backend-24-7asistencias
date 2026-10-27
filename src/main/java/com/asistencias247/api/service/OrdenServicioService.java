@@ -4,16 +4,19 @@ import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.entity.Afiliado;
+import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.mapper.OrdenServicioMapper;
 import com.asistencias247.api.repository.AfiliadoRepository;
+import com.asistencias247.api.repository.CuentaRepository;
 import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -34,12 +37,27 @@ public class OrdenServicioService implements IOrdenServicioService {
     private final OrdenServicioRepository ordenServicioRepository;
     private final AfiliadoRepository afiliadoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final CuentaRepository cuentaRepository;
     private final OrdenServicioMapper ordenServicioMapper;
     private final OneSignalPushService oneSignalPushService;
 
     @Override
     @Transactional
     public OrdenDetalleAdminDto crearOrden(CrearOrdenRequest request) {
+        String numeroCasoLimpio = request.getNumeroCaso() != null ? request.getNumeroCaso().trim() : "";
+        String numeroOtLimpio = request.getNumeroOt() != null ? request.getNumeroOt().trim() : "";
+
+        if (ordenServicioRepository.existsByNumeroCasoIgnoreCase(numeroCasoLimpio)) {
+            throw new DataIntegrityViolationException("El Número de Caso '" + numeroCasoLimpio + "' ya se encuentra registrado en otra orden.");
+        }
+
+        if (ordenServicioRepository.existsByNumeroOtIgnoreCase(numeroOtLimpio)) {
+            throw new DataIntegrityViolationException("El Número de OT '" + numeroOtLimpio + "' ya se encuentra registrado en otra orden.");
+        }
+
+        Cuenta cuenta = cuentaRepository.findById(request.getCuentaId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuenta / Aseguradora no encontrada con ID: " + request.getCuentaId()));
+
         Afiliado afiliado = afiliadoRepository.findById(request.getAfiliadoId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Afiliado no encontrado con ID: " + request.getAfiliadoId()));
 
@@ -54,6 +72,10 @@ public class OrdenServicioService implements IOrdenServicioService {
 
         OrdenServicio orden = OrdenServicio.builder()
                 .codigoOrden(codigoOrden)
+                .numeroCaso(numeroCasoLimpio)
+                .numeroOt(numeroOtLimpio)
+                .fechaPactada(request.getFechaPactada())
+                .cuenta(cuenta)
                 .tipoServicio(request.getTipoServicio())
                 .estado(EstadoOrden.PENDIENTE)
                 .afiliado(afiliado)

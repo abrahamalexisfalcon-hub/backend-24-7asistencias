@@ -12,6 +12,11 @@ public class OrdenResumenTecnicoDto {
 
     private Long id;
     private String codigoOrden;
+    private String numeroCaso;
+    private String numeroOt;
+    private String fechaPactada;
+    private Long cuentaId;
+    private String cuentaNombre;
     private String tipoServicio;
     private EstadoOrden estado;
     private String nombreAfiliado;

@@ -18,37 +18,41 @@ import java.util.Optional;
 public interface OrdenServicioRepository extends JpaRepository<OrdenServicio, Long> {
 
     @Override
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
     Optional<OrdenServicio> findById(Long id);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio", "hojaServicio.materiales", "hojaServicio.materiales.material"})
     Optional<OrdenServicio> findByCodigoOrden(String codigoOrden);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    boolean existsByNumeroCasoIgnoreCase(String numeroCaso);
+
+    boolean existsByNumeroOtIgnoreCase(String numeroOt);
+
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findByTecnicoIdOrderByFechaAsignacionDesc(Long tecnicoId);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     Page<OrdenServicio> findByTecnicoIdOrderByFechaAsignacionDesc(Long tecnicoId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findByTecnicoIdAndEstado(Long tecnicoId, EstadoOrden estado);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findByTecnicoIdAndEstadoOrderByFechaAsignacionDesc(Long tecnicoId, EstadoOrden estado);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findByTecnicoIdAndEstadoNotOrderByFechaAsignacionDesc(Long tecnicoId, EstadoOrden estado);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findAllByOrderByFechaAsignacionDesc();
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     Page<OrdenServicio> findAllByOrderByFechaAsignacionDesc(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     List<OrdenServicio> findByEstadoOrderByFechaAsignacionDesc(EstadoOrden estado);
 
-    @EntityGraph(attributePaths = {"afiliado", "tecnico", "hojaServicio"})
+    @EntityGraph(attributePaths = {"afiliado", "tecnico", "cuenta", "hojaServicio"})
     Page<OrdenServicio> findByEstadoOrderByFechaAsignacionDesc(EstadoOrden estado, Pageable pageable);
 
     @Query("SELECT COUNT(o) FROM OrdenServicio o WHERE EXTRACT(YEAR FROM o.fechaAsignacion) = :anio")

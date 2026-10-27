@@ -14,6 +14,12 @@ public class OrdenDetalleAdminDto {
 
     private Long id;
     private String codigoOrden;
+    private String numeroCaso;
+    private String numeroOt;
+    private LocalDateTime fechaPactada;
+    private Long cuentaId;
+    private String cuentaNombre;
+    private CuentaDto cuenta;
     private String tipoServicio;
     private EstadoOrden estado;
     private LocalDateTime fechaAsignacion;

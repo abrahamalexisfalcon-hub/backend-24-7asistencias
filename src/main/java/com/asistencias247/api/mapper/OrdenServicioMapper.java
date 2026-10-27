@@ -24,6 +24,9 @@ public class OrdenServicioMapper {
         OrdenDetalleAdminDto.OrdenDetalleAdminDtoBuilder builder = OrdenDetalleAdminDto.builder()
                 .id(orden.getId())
                 .codigoOrden(orden.getCodigoOrden())
+                .numeroCaso(orden.getNumeroCaso())
+                .numeroOt(orden.getNumeroOt())
+                .fechaPactada(orden.getFechaPactada())
                 .tipoServicio(orden.getTipoServicio())
                 .estado(orden.getEstado())
                 .fechaAsignacion(orden.getFechaAsignacion())
@@ -31,6 +34,19 @@ public class OrdenServicioMapper {
                 .fechaFinalizacion(orden.getFechaFinalizacion())
                 .motivoCancelacion(orden.getMotivoCancelacion())
                 .fechaCancelacion(orden.getFechaCancelacion());
+
+        if (orden.getCuenta() != null) {
+            com.asistencias247.api.entity.Cuenta cta = orden.getCuenta();
+            builder.cuentaId(cta.getId())
+                    .cuentaNombre(cta.getNombre())
+                    .cuenta(com.asistencias247.api.dto.CuentaDto.builder()
+                            .id(cta.getId())
+                            .nombre(cta.getNombre())
+                            .activo(cta.getActivo())
+                            .createdAt(cta.getCreatedAt())
+                            .updatedAt(cta.getUpdatedAt())
+                            .build());
+        }
 
         if (orden.getAfiliado() != null) {
             Afiliado af = orden.getAfiliado();
@@ -67,7 +83,9 @@ public class OrdenServicioMapper {
                 : orden.getFechaAsignacion();
         if (fechaBase != null) {
             builder.fechaCreacion(fechaBase.toString());
-            builder.fechaProgramada(fechaBase.toString());
+            builder.fechaProgramada(orden.getFechaPactada() != null ? orden.getFechaPactada().toString() : fechaBase.toString());
+        } else if (orden.getFechaPactada() != null) {
+            builder.fechaProgramada(orden.getFechaPactada().toString());
         }
 
         if (orden.getHojaServicio() != null) {

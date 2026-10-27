@@ -12,7 +12,10 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_ordenes_estado", columnList = "estado"),
                 @Index(name = "idx_ordenes_tecnico_id", columnList = "tecnico_id"),
                 @Index(name = "idx_ordenes_codigo", columnList = "codigo_orden"),
-                @Index(name = "idx_ordenes_fecha_creacion", columnList = "fecha_creacion")
+                @Index(name = "idx_ordenes_fecha_creacion", columnList = "fecha_creacion"),
+                @Index(name = "idx_ordenes_numero_caso", columnList = "numero_caso"),
+                @Index(name = "idx_ordenes_numero_ot", columnList = "numero_ot"),
+                @Index(name = "idx_ordenes_cuenta_id", columnList = "cuenta_id")
         }
 )
 @Getter
@@ -28,6 +31,19 @@ public class OrdenServicio {
 
     @Column(name = "codigo_orden", nullable = false, unique = true, length = 30)
     private String codigoOrden;
+
+    @Column(name = "numero_caso", unique = true, length = 50)
+    private String numeroCaso;
+
+    @Column(name = "numero_ot", unique = true, length = 50)
+    private String numeroOt;
+
+    @Column(name = "fecha_pactada")
+    private LocalDateTime fechaPactada;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cuenta_id")
+    private Cuenta cuenta;
 
     @Column(name = "tipo_servicio", nullable = false, length = 100)
     private String tipoServicio;
