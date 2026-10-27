@@ -6,12 +6,14 @@ import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.entity.Afiliado;
+import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.mapper.OrdenServicioMapper;
 import com.asistencias247.api.repository.AfiliadoRepository;
+import com.asistencias247.api.repository.CuentaRepository;
 import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import com.asistencias247.api.security.JwtService;
@@ -34,6 +36,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,6 +56,9 @@ class CoreServicesUnitTests {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private CuentaRepository cuentaRepository;
 
     @Mock
     private AuthenticationManager authenticationManager;
@@ -84,6 +90,7 @@ class CoreServicesUnitTests {
                 ordenServicioRepository,
                 afiliadoRepository,
                 usuarioRepository,
+                cuentaRepository,
                 ordenServicioMapper,
                 oneSignalPushService
         );
@@ -162,13 +169,26 @@ class CoreServicesUnitTests {
                 .rol(RolUsuario.TECNICO)
                 .build();
 
+        Cuenta cuenta = Cuenta.builder()
+                .id(1L)
+                .nombre("Rímac Seguros")
+                .activo(true)
+                .build();
+
         CrearOrdenRequest req = new CrearOrdenRequest();
         req.setAfiliadoId(10L);
         req.setTecnicoId(7L);
+        req.setCuentaId(1L);
+        req.setNumeroCaso("CASO-2026-001");
+        req.setNumeroOt("OT-2026-001");
+        req.setFechaPactada(LocalDateTime.now().plusHours(2));
         req.setTipoServicio("GASFITERIA");
 
         when(afiliadoRepository.findById(10L)).thenReturn(Optional.of(afiliado));
         when(usuarioRepository.findById(7L)).thenReturn(Optional.of(tecnico));
+        when(cuentaRepository.findById(1L)).thenReturn(Optional.of(cuenta));
+        when(ordenServicioRepository.existsByNumeroCaso(anyString())).thenReturn(false);
+        when(ordenServicioRepository.existsByNumeroOt(anyString())).thenReturn(false);
         when(ordenServicioRepository.countByAnioAsignacion(anyInt())).thenReturn(4L);
         when(ordenServicioRepository.findByCodigoOrden(anyString())).thenReturn(Optional.empty());
         when(ordenServicioRepository.save(any(OrdenServicio.class))).thenAnswer(inv -> {
