@@ -52,15 +52,31 @@ public class TecnicoService {
 
     @Transactional
     public TecnicoResumenDto crearTecnico(CrearTecnicoRequest request) {
-        if (usuarioRepository.existsByCorreo(request.getCorreo().trim())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un usuario registrado con el correo: " + request.getCorreo());
+        String correoLimpio = request.getCorreo().trim().toLowerCase();
+        String telefonoLimpio = request.getTelefono().replaceAll("\\D", "");
+        String pinLimpio = request.getPassword().trim();
+
+        if (telefonoLimpio.length() < 9) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de teléfono debe tener al menos 9 dígitos numéricos.");
+        }
+
+        if (!pinLimpio.matches("^\\d{4}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El PIN de acceso debe tener exactamente 4 dígitos numéricos.");
+        }
+
+        if (usuarioRepository.existsByCorreo(correoLimpio)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un usuario registrado con el correo: " + correoLimpio);
+        }
+
+        if (usuarioRepository.existsByTelefono(telefonoLimpio)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un usuario registrado con el número de celular: " + telefonoLimpio);
         }
 
         Usuario tecnico = Usuario.builder()
                 .nombreCompleto(request.getNombreCompleto().trim())
-                .correo(request.getCorreo().trim().toLowerCase())
-                .telefono(request.getTelefono().trim())
-                .password(passwordEncoder.encode(request.getPassword().trim()))
+                .correo(correoLimpio)
+                .telefono(telefonoLimpio)
+                .password(passwordEncoder.encode(pinLimpio))
                 .rol(RolUsuario.TECNICO)
                 .activo(true)
                 .disponible(true)
@@ -68,7 +84,7 @@ public class TecnicoService {
                 .build();
 
         Usuario guardado = usuarioRepository.save(tecnico);
-        log.info("Nuevo técnico registrado por administración: id={}, correo={}", guardado.getId(), guardado.getCorreo());
+        log.info("Nuevo técnico registrado por administración: id={}, correo={}, telefono={}", guardado.getId(), guardado.getCorreo(), guardado.getTelefono());
         return mapearATecnicoResumen(guardado);
     }
 
@@ -105,13 +121,24 @@ public class TecnicoService {
             tecnico.setNombreCompleto(request.getNombreCompleto().trim());
         }
         if (request.getTelefono() != null && !request.getTelefono().isBlank()) {
-            tecnico.setTelefono(request.getTelefono().trim());
+            String telLimpio = request.getTelefono().replaceAll("\\D", "");
+            if (telLimpio.length() < 9) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de teléfono debe tener al menos 9 dígitos numéricos.");
+            }
+            if (usuarioRepository.existsByTelefonoAndIdNot(telLimpio, id)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otro usuario registrado con el número de celular: " + telLimpio);
+            }
+            tecnico.setTelefono(telLimpio);
         }
         if (request.getEspecialidad() != null && !request.getEspecialidad().isBlank()) {
             tecnico.setEspecialidad(request.getEspecialidad().trim());
         }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            tecnico.setPassword(passwordEncoder.encode(request.getPassword().trim()));
+            String pinLimpio = request.getPassword().trim();
+            if (!pinLimpio.matches("^\\d{4}$")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El PIN de acceso debe tener exactamente 4 dígitos numéricos.");
+            }
+            tecnico.setPassword(passwordEncoder.encode(pinLimpio));
         }
 
         Usuario guardado = usuarioRepository.save(tecnico);

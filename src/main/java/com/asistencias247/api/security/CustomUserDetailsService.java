@@ -21,9 +21,12 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UsuarioRepository usuarioRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String correo) throws UsernameNotFoundException {
-        Usuario usuario = usuarioRepository.findByCorreo(correo)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con correo: " + correo));
+    public UserDetails loadUserByUsername(String identificador) throws UsernameNotFoundException {
+        String idLimpio = identificador != null ? identificador.trim() : "";
+        Usuario usuario = usuarioRepository.findByCorreo(idLimpio)
+                .or(() -> usuarioRepository.findByTelefono(idLimpio))
+                .or(() -> usuarioRepository.findByCorreoIgnoreCaseOrTelefono(idLimpio, idLimpio))
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado con correo o celular: " + idLimpio));
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().name()));

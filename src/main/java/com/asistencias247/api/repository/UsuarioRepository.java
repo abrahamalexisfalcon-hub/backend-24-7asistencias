@@ -13,7 +13,15 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByCorreo(String correo);
 
+    Optional<Usuario> findByTelefono(String telefono);
+
+    Optional<Usuario> findByCorreoIgnoreCaseOrTelefono(String correo, String telefono);
+
     boolean existsByCorreo(String correo);
+
+    boolean existsByTelefono(String telefono);
+
+    boolean existsByTelefonoAndIdNot(String telefono, Long id);
 
     List<Usuario> findByRolAndActivoTrueOrderByNombreCompletoAsc(RolUsuario rol);
 

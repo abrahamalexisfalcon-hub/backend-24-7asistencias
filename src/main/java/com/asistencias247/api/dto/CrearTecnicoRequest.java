@@ -1,8 +1,9 @@
 package com.asistencias247.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
 @Getter
@@ -19,11 +20,13 @@ public class CrearTecnicoRequest {
     @Email(message = "El formato del correo es inválido")
     private String correo;
 
-    @NotBlank(message = "La contraseña es obligatoria")
-    @Size(min = 4, message = "La contraseña debe tener al menos 4 caracteres")
+    @NotBlank(message = "El PIN de acceso es obligatorio")
+    @Pattern(regexp = "^[0-9]{4}$", message = "El PIN de acceso debe contener exactamente 4 dígitos numéricos")
+    @JsonAlias({"pin"})
     private String password;
 
     @NotBlank(message = "El teléfono es obligatorio")
+    @Pattern(regexp = "^[0-9]{9,15}$", message = "El teléfono debe contener solo números (9 dígitos)")
     private String telefono;
 
     @NotBlank(message = "La especialidad es obligatoria")

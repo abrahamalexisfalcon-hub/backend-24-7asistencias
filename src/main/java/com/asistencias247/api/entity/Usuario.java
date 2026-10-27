@@ -3,17 +3,16 @@ package com.asistencias247.api.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-@Entity 
+@Entity
 @Table(name = "usuarios")
 @Getter
-@Setter 
-@NoArgsConstructor 
-@AllArgsConstructor 
-@Builder 
-
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Usuario {
-    
-@Id
+
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -23,7 +22,7 @@ public class Usuario {
     @Column(nullable = false, unique = true, length = 100)
     private String correo;
 
-    @Column(nullable = false, length = 15)
+    @Column(nullable = false, unique = true, length = 15)
     private String telefono;
 
     @Column(nullable = false)
@@ -46,4 +45,3 @@ public class Usuario {
     @Column(length = 100)
     private String especialidad;
 }
-
