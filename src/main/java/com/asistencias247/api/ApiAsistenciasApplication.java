@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import java.util.Map;
 import java.util.TimeZone;
 import org.springframework.scheduling.annotation.EnableAsync;
 
@@ -17,6 +18,15 @@ public class ApiAsistenciasApplication {
     }
 
     public static void main(String[] args) {
-        SpringApplication.run(ApiAsistenciasApplication.class, args);
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Lima"));
+        SpringApplication app = new SpringApplication(ApiAsistenciasApplication.class);
+        app.setDefaultProperties(Map.of(
+                "spring.servlet.multipart.max-file-size", "20MB",
+                "spring.servlet.multipart.max-request-size", "25MB",
+                "server.tomcat.max-swallow-size", "25MB",
+                "server.tomcat.max-http-form-post-size", "25MB",
+                "spring.jackson.time-zone", "America/Lima"
+        ));
+        app.run(args);
     }
 }

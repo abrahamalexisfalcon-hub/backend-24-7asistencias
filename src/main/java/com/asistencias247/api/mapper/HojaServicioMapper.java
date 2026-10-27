@@ -30,11 +30,20 @@ public class HojaServicioMapper {
             }
         }
 
+        String fechaLlegadaIso = hoja.getOrdenServicio() != null && hoja.getOrdenServicio().getFechaLlegada() != null
+                ? hoja.getOrdenServicio().getFechaLlegada().toString()
+                : null;
+        String fechaFinIso = hoja.getOrdenServicio() != null && hoja.getOrdenServicio().getFechaFinalizacion() != null
+                ? hoja.getOrdenServicio().getFechaFinalizacion().toString()
+                : null;
+
         return CierreHojaServicioResponseDto.builder()
                 .mensaje(mensaje)
                 .hojaServicioId(hoja.getId())
                 .ordenId(ordenId)
                 .estado(EstadoOrden.FINALIZADA)
+                .fechaLlegada(fechaLlegadaIso)
+                .fechaFinalizacion(fechaFinIso)
                 .firmaDigitalUrl(hoja.getFirmaDigitalUrl())
                 .firmaAfiliadoUrl(hoja.getFirmaDigitalUrl())
                 .firmaClienteUrl(hoja.getFirmaDigitalUrl())

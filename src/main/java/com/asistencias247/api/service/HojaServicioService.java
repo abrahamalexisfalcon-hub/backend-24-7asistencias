@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -27,6 +28,8 @@ import java.util.concurrent.Executor;
 @Slf4j
 @Service
 public class HojaServicioService {
+
+    private static final ZoneId ZONA_PERU = ZoneId.of("America/Lima");
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final HojaServicioRepository hojaServicioRepository;
@@ -185,10 +188,14 @@ public class HojaServicioService {
 
             HojaServicio hojaGuardada = hojaServicioRepository.saveAndFlush(hoja);
 
+            LocalDateTime ahoraPeru = LocalDateTime.now(ZONA_PERU);
+            if (orden.getFechaLlegada() == null) {
+                orden.setFechaLlegada(ahoraPeru);
+            }
             orden.setHojaServicio(hojaGuardada);
             orden.setEstado(EstadoOrden.FINALIZADA);
-            orden.setFechaFinalizacion(LocalDateTime.now());
-            orden.setFechaFin(LocalDateTime.now());
+            orden.setFechaFinalizacion(ahoraPeru);
+            orden.setFechaFin(ahoraPeru);
             ordenServicioRepository.saveAndFlush(orden);
 
             return hojaGuardada;

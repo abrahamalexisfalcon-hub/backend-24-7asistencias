@@ -15,6 +15,8 @@ public class CierreHojaServicioResponseDto {
     private Long hojaServicioId;
     private Long ordenId;
     private EstadoOrden estado;
+    private String fechaLlegada;
+    private String fechaFinalizacion;
     private String firmaDigitalUrl;
     private String firmaAfiliadoUrl;
     private String firmaClienteUrl;

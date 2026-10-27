@@ -27,12 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrdenServicioService implements IOrdenServicioService {
+
+    private static final ZoneId ZONA_PERU = ZoneId.of("America/Lima");
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final AfiliadoRepository afiliadoRepository;
@@ -67,7 +70,7 @@ public class OrdenServicioService implements IOrdenServicioService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Técnico no encontrado con ID: " + request.getTecnicoId()));
         }
 
-        LocalDateTime fechaAsignacion = LocalDateTime.now();
+        LocalDateTime fechaAsignacion = LocalDateTime.now(ZONA_PERU);
         String codigoOrden = generarCorrelativoAnual(fechaAsignacion.getYear());
 
         OrdenServicio orden = OrdenServicio.builder()

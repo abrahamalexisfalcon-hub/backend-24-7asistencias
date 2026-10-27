@@ -16,11 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class OrdenTecnicoService implements IOrdenTecnicoService {
+
+    private static final ZoneId ZONA_PERU = ZoneId.of("America/Lima");
 
     private final OrdenServicioRepository ordenServicioRepository;
     private final UsuarioRepository usuarioRepository;
@@ -102,12 +105,20 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
 
         validarPropiedadOrdenSiEsTecnico(orden);
 
+        if (orden.getEstado() == EstadoOrden.EN_DOMICILIO) {
+            if (orden.getFechaLlegada() == null) {
+                orden.setFechaLlegada(LocalDateTime.now(ZONA_PERU));
+                orden = ordenServicioRepository.save(orden);
+            }
+            return convertirAResumenDto(orden);
+        }
+
         if (!orden.getEstado().puedeTransicionarA(EstadoOrden.EN_DOMICILIO)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La orden no puede pasar al estado EN_DOMICILIO desde su estado actual");
         }
 
         orden.setEstado(EstadoOrden.EN_DOMICILIO);
-        orden.setFechaLlegada(LocalDateTime.now());
+        orden.setFechaLlegada(LocalDateTime.now(ZONA_PERU));
         OrdenServicio ordenActualizada = ordenServicioRepository.save(orden);
 
         return convertirAResumenDto(ordenActualizada);
@@ -132,7 +143,7 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
 
         orden.setEstado(EstadoOrden.CANCELADA);
         orden.setMotivoCancelacion(motivoLimpio);
-        orden.setFechaCancelacion(LocalDateTime.now());
+        orden.setFechaCancelacion(LocalDateTime.now(ZONA_PERU));
         OrdenServicio ordenActualizada = ordenServicioRepository.save(orden);
 
         return convertirAResumenDto(ordenActualizada);
@@ -174,12 +185,15 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
     private OrdenResumenTecnicoDto convertirAResumenDto(OrdenServicio orden) {
         java.time.LocalDateTime fechaBase = orden.getFechaAsignacion() != null
                 ? orden.getFechaAsignacion()
-                : (orden.getFechaCreacion() != null ? orden.getFechaCreacion() : java.time.LocalDateTime.now());
+                : (orden.getFechaCreacion() != null ? orden.getFechaCreacion() : java.time.LocalDateTime.now(ZONA_PERU));
         String fechaIso = fechaBase.toString();
 
         String horaLleg = orden.getFechaLlegada() != null
                 ? orden.getFechaLlegada().toString()
                 : null;
+        String fechaFinIso = orden.getFechaFinalizacion() != null
+                ? orden.getFechaFinalizacion().toString()
+                : (orden.getFechaFin() != null ? orden.getFechaFin().toString() : null);
 
         String tecNombre = orden.getTecnico() != null ? orden.getTecnico().getNombreCompleto() : null;
         String tecFirmaUrl = orden.getTecnico() != null ? orden.getTecnico().getFirmaUrl() : null;
@@ -241,7 +255,9 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
                 .fechaProgramada(orden.getFechaPactada() != null ? orden.getFechaPactada().toString() : fechaIso)
                 .fechaCreacion(fechaIso)
                 .fechaAsignacion(orden.getFechaAsignacion() != null ? orden.getFechaAsignacion().toString() : fechaIso)
+                .fechaLlegada(horaLleg)
                 .horaLlegada(horaLleg)
+                .fechaFinalizacion(fechaFinIso)
                 .tecnicoNombre(tecNombre)
                 .tecnicoFirmaUrl(tecFirmaUrl)
                 .firmaDigitalUrl(firmaDigitalUrl)
