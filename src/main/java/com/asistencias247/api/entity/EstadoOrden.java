@@ -31,7 +31,7 @@ public enum EstadoOrden {
     CANCELADA {
         @Override
         public Set<EstadoOrden> siguientesPermitidos() {
-            return EnumSet.of(CANCELADA);
+            return EnumSet.of(CANCELADA, PENDIENTE);
         }
     };
 

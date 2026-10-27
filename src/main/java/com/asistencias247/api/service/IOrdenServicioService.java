@@ -3,6 +3,7 @@ package com.asistencias247.api.service;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
+import com.asistencias247.api.dto.ReaperturarOrdenRequest;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,8 @@ public interface IOrdenServicioService {
     OrdenServicio marcarAsistidoNoRealizado(Long id, String motivo);
 
     OrdenDetalleAdminDto actualizarObservacionCancelacion(Long id, CancelarOrdenRequest request);
+
+    OrdenDetalleAdminDto reaperturarOrden(Long id, ReaperturarOrdenRequest request);
 
     String generarCorrelativoAnual(int anio);
 

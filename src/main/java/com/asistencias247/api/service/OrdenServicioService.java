@@ -3,6 +3,7 @@ package com.asistencias247.api.service;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
+import com.asistencias247.api.dto.ReaperturarOrdenRequest;
 import com.asistencias247.api.entity.Afiliado;
 import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.EstadoOrden;
@@ -215,6 +216,49 @@ public class OrdenServicioService implements IOrdenServicioService {
 
         OrdenServicio guardada = ordenServicioRepository.save(orden);
         return ordenServicioMapper.toDetalleAdmin(guardada);
+    }
+
+    @Override
+    @Transactional
+    public OrdenDetalleAdminDto reaperturarOrden(Long id, ReaperturarOrdenRequest request) {
+        OrdenServicio orden = ordenServicioRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden de servicio no encontrada con ID: " + id));
+
+        if (orden.getEstado() != EstadoOrden.CANCELADA) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Solo se pueden reaperturar órdenes en estado Asistido No Realizado / Cancelada");
+        }
+
+        LocalDateTime nuevaFechaPactada = request.getFechaPactadaEfectiva();
+        if (nuevaFechaPactada == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva fecha y hora pactada es obligatoria");
+        }
+
+        Usuario tecnico = usuarioRepository.findById(request.getTecnicoId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Técnico no encontrado con ID: " + request.getTecnicoId()));
+
+        // Resetear estado y marcas de ejecución/cancelación previas para reiniciar el flujo en Paso 1
+        orden.setEstado(EstadoOrden.PENDIENTE);
+        orden.setFechaPactada(nuevaFechaPactada);
+        orden.setFechaAsignacion(LocalDateTime.now(ZONA_PERU));
+        orden.setTecnico(tecnico);
+        orden.setFechaLlegada(null);
+        orden.setFechaFinalizacion(null);
+        orden.setFechaCancelacion(null);
+
+        if (request.getObservacion() != null && !request.getObservacion().isBlank()) {
+            orden.setMotivoCancelacion(request.getObservacion().trim());
+        } else {
+            orden.setMotivoCancelacion(null);
+        }
+
+        OrdenServicio guardada = ordenServicioRepository.save(orden);
+        OrdenDetalleAdminDto dto = ordenServicioMapper.toDetalleAdmin(guardada);
+
+        notificarAsignacionTecnico(guardada);
+
+        return dto;
     }
 
     private void validarPropiedadOrdenSiEsTecnico(OrdenServicio orden) {

@@ -4,6 +4,7 @@ import com.asistencias247.api.dto.AsistidoNoRealizadoDTO;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.dto.OrdenResumenTecnicoDto;
+import com.asistencias247.api.dto.ReaperturarOrdenRequest;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.service.IOrdenServicioService;
@@ -84,5 +85,14 @@ public class OrdenController {
             @Valid @RequestBody CancelarOrdenRequest request) {
         OrdenDetalleAdminDto actualizada = ordenServicioService.actualizarObservacionCancelacion(id, request);
         return ResponseEntity.ok(actualizada);
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'ADMINISTRADOR')")
+    @RequestMapping(value = "/{id}/reaperturar", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<OrdenDetalleAdminDto> reaperturarOrden(
+            @PathVariable Long id,
+            @Valid @RequestBody ReaperturarOrdenRequest request) {
+        OrdenDetalleAdminDto reaperturada = ordenServicioService.reaperturarOrden(id, request);
+        return ResponseEntity.ok(reaperturada);
     }
 }

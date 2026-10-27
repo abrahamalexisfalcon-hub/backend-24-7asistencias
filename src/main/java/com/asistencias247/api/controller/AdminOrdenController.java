@@ -3,6 +3,7 @@ package com.asistencias247.api.controller;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
+import com.asistencias247.api.dto.ReaperturarOrdenRequest;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.service.IOrdenServicioService;
 import jakarta.validation.Valid;
@@ -64,6 +65,14 @@ public class AdminOrdenController {
             @Valid @RequestBody CancelarOrdenRequest request) {
         OrdenDetalleAdminDto actualizada = ordenServicioService.actualizarObservacionCancelacion(id, request);
         return ResponseEntity.ok(actualizada);
+    }
+
+    @RequestMapping(value = "/{id}/reaperturar", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<OrdenDetalleAdminDto> reaperturarOrden(
+            @PathVariable Long id,
+            @Valid @RequestBody ReaperturarOrdenRequest request) {
+        OrdenDetalleAdminDto reaperturada = ordenServicioService.reaperturarOrden(id, request);
+        return ResponseEntity.ok(reaperturada);
     }
 
     @DeleteMapping("/{id}")
