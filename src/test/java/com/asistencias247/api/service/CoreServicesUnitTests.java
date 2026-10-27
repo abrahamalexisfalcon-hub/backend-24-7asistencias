@@ -187,8 +187,8 @@ class CoreServicesUnitTests {
         when(afiliadoRepository.findById(10L)).thenReturn(Optional.of(afiliado));
         when(usuarioRepository.findById(7L)).thenReturn(Optional.of(tecnico));
         when(cuentaRepository.findById(1L)).thenReturn(Optional.of(cuenta));
-        when(ordenServicioRepository.existsByNumeroCaso(anyString())).thenReturn(false);
-        when(ordenServicioRepository.existsByNumeroOt(anyString())).thenReturn(false);
+        when(ordenServicioRepository.existsByNumeroCasoIgnoreCase(anyString())).thenReturn(false);
+        when(ordenServicioRepository.existsByNumeroOtIgnoreCase(anyString())).thenReturn(false);
         when(ordenServicioRepository.countByAnioAsignacion(anyInt())).thenReturn(4L);
         when(ordenServicioRepository.findByCodigoOrden(anyString())).thenReturn(Optional.empty());
         when(ordenServicioRepository.save(any(OrdenServicio.class))).thenAnswer(inv -> {
