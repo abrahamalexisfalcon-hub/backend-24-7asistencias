@@ -37,6 +37,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -75,7 +76,9 @@ class CoreServicesUnitTests {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secretKey",
                 "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 36000000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpirationAdmin", 7200000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpirationTecnico", 43200000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 7200000L);
 
         ordenServicioMapper = new OrdenServicioMapper();
         pushCounter = new AtomicInteger(0);
@@ -122,6 +125,18 @@ class CoreServicesUnitTests {
         assertEquals(15L, jwtService.extractUsuarioId(token));
         assertEquals("TECNICO", jwtService.extractRol(token));
         assertTrue(jwtService.isTokenValid(token, userDetails));
+
+        // Verificar expiración de 12 horas para rol TECNICO
+        Date expTecnico = jwtService.extractExpiration(token);
+        long diffTecnico = expTecnico.getTime() - System.currentTimeMillis();
+        assertTrue(diffTecnico > 43100000L && diffTecnico <= 43200000L);
+
+        // Verificar expiración de 2 horas para rol ADMINISTRADOR
+        UserDetails adminDetails = new User("admin@asistencias247.com", "pass", List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR")));
+        String adminToken = jwtService.generateToken(adminDetails, 1L, "ADMINISTRADOR");
+        Date expAdmin = jwtService.extractExpiration(adminToken);
+        long diffAdmin = expAdmin.getTime() - System.currentTimeMillis();
+        assertTrue(diffAdmin > 7100000L && diffAdmin <= 7200000L);
     }
 
     @Test
@@ -149,6 +164,7 @@ class CoreServicesUnitTests {
         assertEquals(1L, response.usuarioId());
         assertEquals("ADMINISTRADOR", response.rol());
         assertTrue(response.disponible());
+        assertEquals(7200000L, response.expiresIn());
     }
 
     // ─── 2. PRUEBAS DE ORDENSERVICIOSERVICE (FLUJO & RBAC) ───────────────────

@@ -45,15 +45,18 @@ public class AuthServiceImpl implements AuthService {
             throw new DisabledException("El usuario técnico se encuentra inactivo. Comuníquese con el administrador.");
         }
 
-        String token = jwtService.generateToken(userDetails, usuario.getId(), usuario.getRol().name());
+        String rolName = usuario.getRol().name();
+        String token = jwtService.generateToken(userDetails, usuario.getId(), rolName);
+        long expiresIn = jwtService.getExpirationForRole(rolName);
 
         return AuthResponseDto.builder()
                 .token(token)
                 .usuarioId(usuario.getId())
                 .nombreCompleto(usuario.getNombreCompleto())
                 .correo(usuario.getCorreo())
-                .rol(usuario.getRol().name())
+                .rol(rolName)
                 .disponible(Boolean.TRUE.equals(usuario.getDisponible()))
+                .expiresIn(expiresIn)
                 .build();
     }
 }

@@ -9,5 +9,6 @@ public record AuthResponseDto(
         String nombreCompleto,
         String correo,
         String rol,
-        Boolean disponible
+        Boolean disponible,
+        Long expiresIn
 ) {}

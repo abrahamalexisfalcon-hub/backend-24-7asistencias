@@ -20,24 +20,44 @@ public class JwtService {
     @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
     private String secretKey;
 
-    @Value("${jwt.expiration:36000000}")
-    private long jwtExpiration;
+    @Value("${jwt.expiration.admin:7200000}")
+    private long jwtExpirationAdmin = 7200000L; // 2 horas (2 * 60 * 60 * 1000)
+
+    @Value("${jwt.expiration.tecnico:43200000}")
+    private long jwtExpirationTecnico = 43200000L; // 12 horas (12 * 60 * 60 * 1000)
+
+    @Value("${jwt.expiration:7200000}")
+    private long jwtExpiration = 7200000L;
+
+    public long getExpirationForRole(String rol) {
+        if (rol != null && (rol.equalsIgnoreCase("ADMIN") || rol.equalsIgnoreCase("ADMINISTRADOR") || rol.toUpperCase().contains("ADMIN"))) {
+            return jwtExpirationAdmin;
+        } else if (rol != null && (rol.equalsIgnoreCase("TECNICO") || rol.toUpperCase().contains("TECNIC"))) {
+            return jwtExpirationTecnico;
+        }
+        return jwtExpiration;
+    }
 
     public String generateToken(UserDetails userDetails, Long usuarioId, String rol) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("usuarioId", usuarioId);
         extraClaims.put("rol", rol);
-        return generateToken(extraClaims, userDetails.getUsername());
+        long expirationMs = getExpirationForRole(rol);
+        return generateToken(extraClaims, userDetails.getUsername(), expirationMs);
     }
 
-    public String generateToken(Map<String, Object> extraClaims, String subject) {
+    public String generateToken(Map<String, Object> extraClaims, String subject, long expirationMs) {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    public String generateToken(Map<String, Object> extraClaims, String subject) {
+        return generateToken(extraClaims, subject, jwtExpiration);
     }
 
     public String extractUsername(String token) {
