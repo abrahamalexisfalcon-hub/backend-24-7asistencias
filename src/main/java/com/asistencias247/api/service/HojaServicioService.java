@@ -58,7 +58,17 @@ public class HojaServicioService {
      * para no agotar el pool de conexiones a la base de datos (NeonDB Pooler).
      */
     public HojaServicio cerrarHojaServicio(Long ordenId, CierreHojaServicioRequest request) {
-        // 1. Verificación preliminar rápida
+        // 1. Validación estricta de evidencias fotográficas obligatorias (Antes y Después)
+        if (request == null
+                || request.getFotoInicialUrl() == null || request.getFotoInicialUrl().isBlank()
+                || request.getFotoFinalUrl() == null || request.getFotoFinalUrl().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Es obligatorio adjuntar la evidencia fotográfica inicial y final del servicio."
+            );
+        }
+
+        // 2. Verificación preliminar rápida
         if (!ordenServicioRepository.existsById(ordenId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId);
         }
