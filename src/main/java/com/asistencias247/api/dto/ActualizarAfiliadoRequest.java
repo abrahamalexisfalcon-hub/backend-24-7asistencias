@@ -18,7 +18,7 @@ public class ActualizarAfiliadoRequest {
     @JsonAlias({"dni"})
     private String dni;
 
-    @NotBlank(message = "El teléfono es obligatorio")
+    @JsonAlias({"telefono", "celular"})
     private String telefono;
 
     @NotBlank(message = "La dirección es obligatoria")

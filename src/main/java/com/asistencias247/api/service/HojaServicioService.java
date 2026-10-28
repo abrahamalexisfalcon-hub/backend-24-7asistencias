@@ -128,6 +128,11 @@ public class HojaServicioService {
             }
 
             if (request != null) {
+                if (request.getDniAfiliado() != null && !request.getDniAfiliado().isBlank()
+                        && orden.getAfiliado() != null) {
+                    orden.getAfiliado().setDni(request.getDniAfiliado().trim());
+                    log.info("DNI del afiliado actualizado durante el cierre de la orden {}", ordenId);
+                }
                 if (request.getEvaluacionAveria() != null) {
                     hoja.setEvaluacionAveria(request.getEvaluacionAveria());
                 }

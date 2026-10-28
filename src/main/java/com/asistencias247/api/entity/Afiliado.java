@@ -18,14 +18,14 @@ public class Afiliado {
     @Column(nullable = false, length = 150)
     private String nombreCompleto;
 
-    @Column(nullable = false, length = 15)
-    private String dni;
+    @Column(length = 15)
+    private String dni; // Opcional: puede completarse durante la atención en campo
 
     @Column(nullable = false, length = 30)
     private String numeroCuenta;
 
-    @Column(nullable = false, length = 15)
-    private String telefono; // Solo visible por administración
+    @Column(length = 15)
+    private String telefono; // Opcional y solo visible por administración
 
     @Column(nullable = false, length = 255)
     private String direccion;

@@ -227,8 +227,7 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
                 ? orden.getAfiliado().getReferencia() : "";
         String distAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getDistrito() != null
                 ? orden.getAfiliado().getDistrito() : "Lima";
-        String dniAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getDni() != null
-                ? orden.getAfiliado().getDni() : "458921456";
+        String dniAfiliado = orden.getAfiliado() != null ? orden.getAfiliado().getDni() : null;
         String ctaAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getNumeroCuenta() != null
                 ? orden.getAfiliado().getNumeroCuenta() : "CTA-8821";
 

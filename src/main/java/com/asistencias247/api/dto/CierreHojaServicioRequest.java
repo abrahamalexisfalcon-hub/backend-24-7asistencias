@@ -20,6 +20,13 @@ public class CierreHojaServicioRequest {
     private String detalleSolucion;
     private String sugerencias;
 
+    /**
+     * DNI del afiliado capturado opcionalmente por el técnico durante la atención.
+     * Si viene vacío, se conserva el valor previamente registrado.
+     */
+    @JsonAlias({"dni", "dniCliente", "documentoAfiliado"})
+    private String dniAfiliado;
+
     @Min(value = 1, message = "La calificación mínima es 1")
     @Max(value = 5, message = "La calificación máxima es 5")
     @JsonAlias({"calificacionAfiliado", "calificacion"})

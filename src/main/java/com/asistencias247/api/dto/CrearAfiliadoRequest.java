@@ -15,10 +15,10 @@ public class CrearAfiliadoRequest {
     @JsonAlias({"nombre", "nombreCompleto"})
     private String nombreCompleto;
 
-    @NotBlank(message = "El DNI es obligatorio")
+    @JsonAlias({"dni"})
     private String dni;
 
-    @NotBlank(message = "El teléfono es obligatorio")
+    @JsonAlias({"telefono", "celular"})
     private String telefono;
 
     @NotBlank(message = "La dirección es obligatoria")

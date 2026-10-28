@@ -22,19 +22,19 @@ public class AfiliadoService {
 
     @Transactional
     public Afiliado crearAfiliado(CrearAfiliadoRequest request) {
-        String dni = request.getDni().trim();
+        String dni = normalizarOpcional(request.getDni());
 
-        // Validar si ya existe un afiliado activo con el mismo DNI
-        if (afiliadoRepository.existsByDniAndActivoTrue(dni)) {
+        // Validar duplicado únicamente cuando el DNI fue proporcionado
+        if (!dni.isEmpty() && afiliadoRepository.existsByDniAndActivoTrue(dni)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un afiliado activo con el DNI: " + dni);
         }
 
         // Si ya existía inactivo con ese DNI, lo reactivamos y actualizamos sus datos
-        Afiliado existente = afiliadoRepository.findByDni(dni).orElse(null);
+        Afiliado existente = dni.isEmpty() ? null : afiliadoRepository.findByDni(dni).orElse(null);
         if (existente != null && !Boolean.TRUE.equals(existente.getActivo())) {
             existente.setActivo(true);
             existente.setNombreCompleto(request.getNombreCompleto().trim());
-            existente.setTelefono(request.getTelefono().trim());
+            existente.setTelefono(normalizarOpcional(request.getTelefono()));
             existente.setDireccion(request.getDireccion().trim());
             if (request.getDistrito() != null) existente.setDistrito(request.getDistrito().trim());
             if (request.getReferencia() != null) existente.setReferencia(request.getReferencia().trim());
@@ -44,13 +44,15 @@ public class AfiliadoService {
         }
 
         String numeroCuenta = (request.getNumeroCuenta() != null && !request.getNumeroCuenta().isBlank())
-                ? request.getNumeroCuenta()
-                : "CTA-" + dni;
+                ? request.getNumeroCuenta().trim()
+                : (!dni.isEmpty()
+                    ? "CTA-" + dni
+                    : "CTA-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase());
 
         Afiliado afiliado = Afiliado.builder()
                 .nombreCompleto(request.getNombreCompleto().trim())
                 .dni(dni)
-                .telefono(request.getTelefono().trim())
+                .telefono(normalizarOpcional(request.getTelefono()))
                 .direccion(request.getDireccion().trim())
                 .distrito(request.getDistrito() != null ? request.getDistrito().trim() : "Villa El Salvador")
                 .referencia(request.getReferencia() != null ? request.getReferencia().trim() : "")
@@ -59,7 +61,7 @@ public class AfiliadoService {
                 .build();
 
         Afiliado guardado = afiliadoRepository.save(afiliado);
-        log.info("Nuevo afiliado registrado con ID {} y DNI {}", guardado.getId(), guardado.getDni());
+        log.info("Nuevo afiliado registrado con ID {} y DNI {}", guardado.getId(), dni.isEmpty() ? "(pendiente)" : dni);
         return guardado;
     }
 
@@ -95,7 +97,7 @@ public class AfiliadoService {
         }
 
         afiliado.setNombreCompleto(request.getNombreCompleto().trim());
-        afiliado.setTelefono(request.getTelefono().trim());
+        afiliado.setTelefono(normalizarOpcional(request.getTelefono()));
         afiliado.setDireccion(request.getDireccion().trim());
 
         if (request.getDistrito() != null && !request.getDistrito().isBlank()) {
@@ -114,5 +116,13 @@ public class AfiliadoService {
         afiliado.setActivo(false);
         afiliadoRepository.save(afiliado);
         log.info("Afiliado ID {} ('{}') dado de baja lógica.", id, afiliado.getNombreCompleto());
+    }
+
+    /**
+     * Normaliza datos opcionales para no romper restricciones NOT NULL heredadas
+     * de la base de datos cuando el DNI o el teléfono aún no se conocen.
+     */
+    private String normalizarOpcional(String valor) {
+        return valor != null ? valor.trim() : "";
     }
 }
