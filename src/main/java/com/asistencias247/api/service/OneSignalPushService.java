@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +24,8 @@ public class OneSignalPushService {
 
     private static final String DEFAULT_KEY_B64 =
             "b3NfdjJfYXBwX2dpcnhld2ZxZnZkcTVrYW10cmw3dnh5ZHlsdWh0cHAyZW5pZXZtdnNleXl4cG1wYXdqemgyYXZxeWR4N3B4aXFsMzRkNnBhbHU1dTdzbWhlcWdzZHJqNWthb2VpeTdybjQ3d2djY3E=";
+
+    private static final String APP_BASE_URL = "https://app.24-7asistencias.com";
 
     @Value("${onesignal.app-id:${ONESIGNAL_APP_ID:32237258-b02d-470e-a80c-9c57fadf03c2}}")
     private String appId;
@@ -93,14 +96,15 @@ public class OneSignalPushService {
         String detalleDireccion = (direccion != null && !direccion.isBlank()) ? direccion : "Lima";
         String contenido = (tipoServicio != null ? tipoServicio : "Servicio") + " • " + detalleDireccion;
 
-        Map<String, Object> payloadPorAlias = Map.of(
-            "app_id", appId.trim(),
-            "include_aliases", Map.of("external_id", List.of(String.valueOf(tecnicoId))),
-            "target_channel", "push",
-            "headings", Map.of("en", titulo, "es", titulo),
-            "contents", Map.of("en", contenido, "es", contenido),
-            "url", "https://app.24-7asistencias.com/tecnico"
-        );
+        String rutaOrden = construirRutaOrden(ordenId);
+        Map<String, Object> payloadPorAlias = new LinkedHashMap<>();
+        payloadPorAlias.put("app_id", appId.trim());
+        payloadPorAlias.put("include_aliases", Map.of("external_id", List.of(String.valueOf(tecnicoId))));
+        payloadPorAlias.put("target_channel", "push");
+        payloadPorAlias.put("headings", Map.of("en", titulo, "es", titulo));
+        payloadPorAlias.put("contents", Map.of("en", contenido, "es", contenido));
+        payloadPorAlias.put("url", APP_BASE_URL + rutaOrden);
+        payloadPorAlias.put("data", Map.of("route", rutaOrden, "ordenId", ordenId != null ? ordenId : ""));
 
         String authHeader = (effectiveApiKey.startsWith("Key ") || effectiveApiKey.startsWith("Basic "))
                 ? effectiveApiKey
@@ -122,26 +126,26 @@ public class OneSignalPushService {
             // ejecutar respaldo automático hacia "Subscribed Users" para garantizar entrega en dispositivos activos
             if (responseBody.contains("\"id\":\"\"") || responseBody.contains("\"errors\"")) {
                 log.warn("[OneSignal-FALLBACK] El external_id={} no tenía suscripciones vinculadas directas. Enviando push por segmento 'Subscribed Users'...", tecnicoId);
-                enviarFallbackSuscritos(authHeader, titulo, contenido);
+                enviarFallbackSuscritos(authHeader, titulo, contenido, rutaOrden);
             }
         } catch (RestClientResponseException ex) {
             log.error("[OneSignal-RESPONSE] Status code: {} | Body: {}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            enviarFallbackSuscritos(authHeader, titulo, contenido);
+            enviarFallbackSuscritos(authHeader, titulo, contenido, rutaOrden);
         } catch (Exception ex) {
             log.error("[OneSignal-ERROR] Error inesperado al enviar notificación push: {}", ex.getMessage(), ex);
         }
     }
 
-    private void enviarFallbackSuscritos(String authHeader, String titulo, String contenido) {
+    private void enviarFallbackSuscritos(String authHeader, String titulo, String contenido, String rutaOrden) {
         try {
-            Map<String, Object> fallbackPayload = Map.of(
-                "app_id", appId.trim(),
-                "included_segments", List.of("Subscribed Users"),
-                "target_channel", "push",
-                "headings", Map.of("en", titulo, "es", titulo),
-                "contents", Map.of("en", contenido, "es", contenido),
-                "url", "https://app.24-7asistencias.com/tecnico"
-            );
+            Map<String, Object> fallbackPayload = new LinkedHashMap<>();
+            fallbackPayload.put("app_id", appId.trim());
+            fallbackPayload.put("included_segments", List.of("Subscribed Users"));
+            fallbackPayload.put("target_channel", "push");
+            fallbackPayload.put("headings", Map.of("en", titulo, "es", titulo));
+            fallbackPayload.put("contents", Map.of("en", contenido, "es", contenido));
+            fallbackPayload.put("url", APP_BASE_URL + rutaOrden);
+            fallbackPayload.put("data", Map.of("route", rutaOrden));
 
             var fallbackRes = restClient.post()
                 .uri("https://onesignal.com/api/v1/notifications")
@@ -155,5 +159,15 @@ public class OneSignalPushService {
         } catch (Exception e) {
             log.error("[OneSignal-FALLBACK-ERROR] Falló el envío de respaldo a Subscribed Users: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Envía al técnico directamente al detalle de la orden cuando se pulsa la
+     * notificación. Si no se dispone del ID, se usa el listado como respaldo.
+     */
+    private String construirRutaOrden(Long ordenId) {
+        return ordenId != null
+                ? "/tecnico/ordenes/" + ordenId
+                : "/tecnico/ordenes";
     }
 }
