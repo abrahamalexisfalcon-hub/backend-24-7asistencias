@@ -77,7 +77,7 @@ class CoreServicesUnitTests {
         ReflectionTestUtils.setField(jwtService, "secretKey",
                 "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
         ReflectionTestUtils.setField(jwtService, "jwtExpirationAdmin", 7200000L);
-        ReflectionTestUtils.setField(jwtService, "jwtExpirationTecnico", 43200000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpirationTecnico", 315360000000L);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 7200000L);
 
         ordenServicioMapper = new OrdenServicioMapper();
@@ -126,10 +126,10 @@ class CoreServicesUnitTests {
         assertEquals("TECNICO", jwtService.extractRol(token));
         assertTrue(jwtService.isTokenValid(token, userDetails));
 
-        // Verificar expiración de 12 horas para rol TECNICO
+        // Verificar expiración persistente (~10 años) para rol TECNICO
         Date expTecnico = jwtService.extractExpiration(token);
         long diffTecnico = expTecnico.getTime() - System.currentTimeMillis();
-        assertTrue(diffTecnico > 43100000L && diffTecnico <= 43200000L);
+        assertTrue(diffTecnico > 315000000000L && diffTecnico <= 315360000000L);
 
         // Verificar expiración de 2 horas para rol ADMINISTRADOR
         UserDetails adminDetails = new User("admin@asistencias247.com", "pass", List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR")));

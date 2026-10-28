@@ -23,8 +23,8 @@ public class JwtService {
     @Value("${jwt.expiration.admin:7200000}")
     private long jwtExpirationAdmin = 7200000L; // 2 horas (2 * 60 * 60 * 1000)
 
-    @Value("${jwt.expiration.tecnico:43200000}")
-    private long jwtExpirationTecnico = 43200000L; // 12 horas (12 * 60 * 60 * 1000)
+    @Value("${jwt.expiration.tecnico:315360000000}")
+    private long jwtExpirationTecnico = 315360000000L; // 10 años: sesión técnica persistente
 
     @Value("${jwt.expiration:7200000}")
     private long jwtExpiration = 7200000L;
