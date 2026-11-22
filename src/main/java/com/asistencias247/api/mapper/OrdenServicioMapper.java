@@ -48,6 +48,10 @@ public class OrdenServicioMapper {
                             .build());
         }
 
+        String dirEfectiva = orden.obtenerDireccionEfectiva();
+        String distEfectivo = orden.obtenerDistritoEfectivo();
+        String refEfectiva = orden.obtenerReferenciaEfectiva();
+
         if (orden.getAfiliado() != null) {
             Afiliado af = orden.getAfiliado();
             builder.afiliadoId(af.getId())
@@ -55,12 +59,25 @@ public class OrdenServicioMapper {
                     .dniAfiliado(af.getDni())
                     .numeroCuentaAfiliado(af.getNumeroCuenta())
                     .telefonoAfiliado(af.getTelefono())
-                    .direccionAfiliado(af.getDireccion())
-                    .distritoAfiliado(af.getDistrito())
-                    .referenciaAfiliado(af.getReferencia())
-                    .direccion(af.getDireccion())
-                    .distrito(af.getDistrito())
-                    .cliente(toClienteInfoAdminDto(af));
+                    .direccionAfiliado(dirEfectiva)
+                    .distritoAfiliado(distEfectivo)
+                    .referenciaAfiliado(refEfectiva)
+                    .direccion(dirEfectiva)
+                    .distrito(distEfectivo)
+                    .cliente(OrdenDetalleAdminDto.ClienteInfoAdminDto.builder()
+                            .id(af.getId())
+                            .nombre(af.getNombreCompleto())
+                            .direccion(dirEfectiva)
+                            .referencia(refEfectiva)
+                            .distrito(distEfectivo)
+                            .telefono(af.getTelefono())
+                            .build());
+        } else {
+            builder.direccionAfiliado(dirEfectiva)
+                    .distritoAfiliado(distEfectivo)
+                    .referenciaAfiliado(refEfectiva)
+                    .direccion(dirEfectiva)
+                    .distrito(distEfectivo);
         }
 
         String tecFirmaUrl = null;
@@ -78,8 +95,8 @@ public class OrdenServicioMapper {
                     .tecnico(toTecnicoInfoAdminDto(tec));
         }
 
-        java.time.LocalDateTime fechaBase = orden.getFechaCreacion() != null 
-                ? orden.getFechaCreacion() 
+        java.time.LocalDateTime fechaBase = orden.getFechaCreacion() != null
+                ? orden.getFechaCreacion()
                 : orden.getFechaAsignacion();
         if (fechaBase != null) {
             builder.fechaCreacion(fechaBase.toString());

@@ -1,8 +1,12 @@
 package com.asistencias247.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -21,10 +25,21 @@ public class ActualizarAfiliadoRequest {
     @JsonAlias({"telefono", "celular"})
     private String telefono;
 
-    @NotBlank(message = "La dirección es obligatoria")
     private String direccion;
 
     private String distrito;
 
     private String referencia;
+
+    private List<DireccionAfiliadoDto> direcciones;
+
+    @AssertTrue(message = "La dirección es obligatoria")
+    @JsonIgnore
+    public boolean isDireccionValida() {
+        if (direccion != null && !direccion.isBlank()) {
+            return true;
+        }
+        return direcciones != null && direcciones.stream()
+                .anyMatch(d -> d != null && d.getDireccion() != null && !d.getDireccion().isBlank());
+    }
 }

@@ -38,6 +38,12 @@ public class CrearOrdenRequest {
     @FutureOrPresent(message = "La fecha y hora pactada no puede estar en el pasado")
     private LocalDateTime fechaPactada;
 
+    private Long direccionId;
+    private String direccionServicio;
+    private String distritoServicio;
+    private String referenciaServicio;
+    private String etiquetaDireccion;
+
     public void setFechaPactada(LocalDateTime fechaPactada) {
         if (fechaPactada != null && fechaPactada.getSecond() == 0 && fechaPactada.getNano() == 0) {
             this.fechaPactada = fechaPactada.withSecond(59);

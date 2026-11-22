@@ -33,7 +33,11 @@ public interface AfiliadoRepository extends JpaRepository<Afiliado, Long> {
            "LOWER(a.nombreCompleto) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(a.dni) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(a.direccion) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(COALESCE(a.distrito, '')) LIKE LOWER(CONCAT('%', :query, '%'))" +
+           "LOWER(COALESCE(a.distrito, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "EXISTS (SELECT d FROM AfiliadoDireccion d WHERE d.afiliado = a AND (" +
+           "LOWER(d.direccion) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(COALESCE(d.distrito, '')) LIKE LOWER(CONCAT('%', :query, '%'))" +
+           "))" +
            ") ORDER BY a.nombreCompleto ASC")
     List<Afiliado> buscarActivos(@Param("query") String query);
 }

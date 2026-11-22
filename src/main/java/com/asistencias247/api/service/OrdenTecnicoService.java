@@ -221,12 +221,16 @@ public class OrdenTecnicoService implements IOrdenTecnicoService {
 
         String nomAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getNombreCompleto() != null
                 ? orden.getAfiliado().getNombreCompleto() : "Cliente 24/7";
-        String dirAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getDireccion() != null
-                ? orden.getAfiliado().getDireccion() : "Dirección no especificada";
-        String refAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getReferencia() != null
-                ? orden.getAfiliado().getReferencia() : "";
-        String distAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getDistrito() != null
-                ? orden.getAfiliado().getDistrito() : "Lima";
+        String dirEfectiva = orden.obtenerDireccionEfectiva();
+        String refEfectiva = orden.obtenerReferenciaEfectiva();
+        String distEfectivo = orden.obtenerDistritoEfectivo();
+
+        String dirAfiliado = dirEfectiva != null && !dirEfectiva.isBlank()
+                ? dirEfectiva : "Dirección no especificada";
+        String refAfiliado = refEfectiva != null
+                ? refEfectiva : "";
+        String distAfiliado = distEfectivo != null && !distEfectivo.isBlank()
+                ? distEfectivo : "Lima";
         String dniAfiliado = orden.getAfiliado() != null ? orden.getAfiliado().getDni() : null;
         String ctaAfiliado = orden.getAfiliado() != null && orden.getAfiliado().getNumeroCuenta() != null
                 ? orden.getAfiliado().getNumeroCuenta() : "CTA-8821";

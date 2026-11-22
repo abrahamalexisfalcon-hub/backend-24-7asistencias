@@ -3,6 +3,9 @@ package com.asistencias247.api.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "afiliados")
 @Getter
@@ -35,6 +38,12 @@ public class Afiliado {
 
     @Column(length = 100)
     private String distrito;
+
+    @OneToMany(mappedBy = "afiliado", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<AfiliadoDireccion> direcciones = new ArrayList<>();
 
     @Builder.Default
     @Column(name = "activo", nullable = false, columnDefinition = "boolean default true")

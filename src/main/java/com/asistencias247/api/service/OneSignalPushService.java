@@ -57,11 +57,13 @@ public class OneSignalPushService {
             return;
         }
         Long tecnicoId = (orden.getTecnico() != null) ? orden.getTecnico().getId() : null;
-        String distrito = (orden.getAfiliado() != null && orden.getAfiliado().getDistrito() != null)
-                ? orden.getAfiliado().getDistrito()
+        String distritoEfectivo = orden.obtenerDistritoEfectivo();
+        String distrito = (distritoEfectivo != null && !distritoEfectivo.isBlank())
+                ? distritoEfectivo
                 : "Lima";
-        String direccion = (orden.getAfiliado() != null && orden.getAfiliado().getDireccion() != null && !orden.getAfiliado().getDireccion().isBlank())
-                ? orden.getAfiliado().getDireccion()
+        String direccionEfectiva = orden.obtenerDireccionEfectiva();
+        String direccion = (direccionEfectiva != null && !direccionEfectiva.isBlank())
+                ? direccionEfectiva
                 : distrito;
 
         enviarNotificacionAsignacion(orden.getId(), tecnicoId, orden.getCodigoOrden(), orden.getTipoServicio(), direccion);

@@ -57,6 +57,15 @@ public class OrdenServicio {
     @JoinColumn(name = "afiliado_id", nullable = false)
     private Afiliado afiliado;
 
+    @Column(name = "direccion_servicio", length = 255)
+    private String direccionServicio;
+
+    @Column(name = "distrito_servicio", length = 100)
+    private String distritoServicio;
+
+    @Column(name = "referencia_servicio", length = 255)
+    private String referenciaServicio;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tecnico_id")
     private Usuario tecnico;
@@ -93,5 +102,26 @@ public class OrdenServicio {
 
     public LocalDateTime getFechaCreacion() {
         return this.fechaCreacion != null ? this.fechaCreacion : this.fechaAsignacion;
+    }
+
+    public String obtenerDireccionEfectiva() {
+        if (direccionServicio != null && !direccionServicio.isBlank()) {
+            return direccionServicio;
+        }
+        return afiliado != null ? afiliado.getDireccion() : null;
+    }
+
+    public String obtenerDistritoEfectivo() {
+        if (distritoServicio != null && !distritoServicio.isBlank()) {
+            return distritoServicio;
+        }
+        return afiliado != null ? afiliado.getDistrito() : null;
+    }
+
+    public String obtenerReferenciaEfectiva() {
+        if (referenciaServicio != null) {
+            return referenciaServicio;
+        }
+        return afiliado != null ? afiliado.getReferencia() : null;
     }
 }

@@ -1,11 +1,16 @@
 package com.asistencias247.api.config;
 
+import com.asistencias247.api.entity.Afiliado;
+import com.asistencias247.api.entity.AfiliadoDireccion;
 import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.Especialidad;
+import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
+import com.asistencias247.api.repository.AfiliadoRepository;
 import com.asistencias247.api.repository.CuentaRepository;
 import com.asistencias247.api.repository.EspecialidadRepository;
+import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +32,8 @@ public class DataSeeder implements CommandLineRunner {
     private final UsuarioRepository usuarioRepository;
     private final CuentaRepository cuentaRepository;
     private final EspecialidadRepository especialidadRepository;
+    private final AfiliadoRepository afiliadoRepository;
+    private final OrdenServicioRepository ordenServicioRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -128,6 +136,56 @@ public class DataSeeder implements CommandLineRunner {
             }
         } catch (Exception e) {
             log.warn("No se pudo completar la migración automática de especialidades de técnicos: {}", e.getMessage());
+        }
+
+        // Migración automática: crear dirección Principal en afiliado_direcciones para afiliados existentes sin direcciones
+        try {
+            List<Afiliado> afiliados = afiliadoRepository.findAll();
+            int afiliadosMigrados = 0;
+            for (Afiliado a : afiliados) {
+                if ((a.getDirecciones() == null || a.getDirecciones().isEmpty())
+                        && a.getDireccion() != null && !a.getDireccion().isBlank()) {
+                    if (a.getDirecciones() == null) {
+                        a.setDirecciones(new ArrayList<>());
+                    }
+                    AfiliadoDireccion dirPrincipal = AfiliadoDireccion.builder()
+                            .afiliado(a)
+                            .etiqueta("Principal")
+                            .direccion(a.getDireccion().trim())
+                            .distrito(a.getDistrito())
+                            .referencia(a.getReferencia())
+                            .esPrincipal(true)
+                            .build();
+                    a.getDirecciones().add(dirPrincipal);
+                    afiliadoRepository.save(a);
+                    afiliadosMigrados++;
+                }
+            }
+            if (afiliadosMigrados > 0) {
+                log.info("Migración automática de direcciones completada para {} afiliado(s).", afiliadosMigrados);
+            }
+        } catch (Exception e) {
+            log.warn("No se pudo completar la migración automática de direcciones de afiliados: {}", e.getMessage());
+        }
+
+        // Migración automática: snapshot de dirección en órdenes existentes sin direccion_servicio
+        try {
+            List<OrdenServicio> ordenes = ordenServicioRepository.findAll();
+            int ordenesMigradas = 0;
+            for (OrdenServicio o : ordenes) {
+                if (o.getDireccionServicio() == null && o.getAfiliado() != null) {
+                    o.setDireccionServicio(o.getAfiliado().getDireccion());
+                    o.setDistritoServicio(o.getAfiliado().getDistrito());
+                    o.setReferenciaServicio(o.getAfiliado().getReferencia());
+                    ordenServicioRepository.save(o);
+                    ordenesMigradas++;
+                }
+            }
+            if (ordenesMigradas > 0) {
+                log.info("Migración automática de snapshot de dirección completada para {} orden(es).", ordenesMigradas);
+            }
+        } catch (Exception e) {
+            log.warn("No se pudo completar la migración automática de direcciones en órdenes de servicio: {}", e.getMessage());
         }
 
         log.info("Inicialización completada. No se generan datos simulados ni de prueba (modo base de datos en limpio).");

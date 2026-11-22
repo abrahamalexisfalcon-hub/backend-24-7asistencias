@@ -5,6 +5,7 @@ import com.asistencias247.api.dto.CrearOrdenRequest;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.dto.ReaperturarOrdenRequest;
 import com.asistencias247.api.entity.Afiliado;
+import com.asistencias247.api.entity.AfiliadoDireccion;
 import com.asistencias247.api.entity.Cuenta;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -71,6 +73,60 @@ public class OrdenServicioService implements IOrdenServicioService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Técnico no encontrado con ID: " + request.getTecnicoId()));
         }
 
+        String dirServicio;
+        String distServicio;
+        String refServicio;
+
+        if (request.getDireccionServicio() != null && !request.getDireccionServicio().isBlank()) {
+            dirServicio = request.getDireccionServicio().trim();
+            distServicio = (request.getDistritoServicio() != null && !request.getDistritoServicio().isBlank())
+                    ? request.getDistritoServicio().trim()
+                    : afiliado.getDistrito();
+            refServicio = request.getReferenciaServicio() != null
+                    ? request.getReferenciaServicio().trim()
+                    : "";
+
+            if (afiliado.getDirecciones() == null) {
+                afiliado.setDirecciones(new ArrayList<>());
+            }
+            boolean yaExiste = afiliado.getDirecciones().stream()
+                    .anyMatch(d -> d.getDireccion() != null && d.getDireccion().trim().equalsIgnoreCase(dirServicio));
+            if (!yaExiste) {
+                String etiqueta = (request.getEtiquetaDireccion() != null && !request.getEtiquetaDireccion().isBlank())
+                        ? request.getEtiquetaDireccion().trim()
+                        : "Dirección adicional";
+                boolean esPrincipal = afiliado.getDirecciones().isEmpty();
+                AfiliadoDireccion nuevaDir = AfiliadoDireccion.builder()
+                        .afiliado(afiliado)
+                        .etiqueta(etiqueta)
+                        .direccion(dirServicio)
+                        .distrito(distServicio)
+                        .referencia(refServicio)
+                        .esPrincipal(esPrincipal)
+                        .build();
+                afiliado.getDirecciones().add(nuevaDir);
+                afiliadoRepository.save(afiliado);
+            }
+        } else if (request.getDireccionId() != null && afiliado.getDirecciones() != null) {
+            AfiliadoDireccion seleccionada = afiliado.getDirecciones().stream()
+                    .filter(d -> d.getId() != null && d.getId().equals(request.getDireccionId()))
+                    .findFirst()
+                    .orElse(null);
+            if (seleccionada != null) {
+                dirServicio = seleccionada.getDireccion();
+                distServicio = seleccionada.getDistrito();
+                refServicio = seleccionada.getReferencia();
+            } else {
+                dirServicio = afiliado.getDireccion();
+                distServicio = afiliado.getDistrito();
+                refServicio = afiliado.getReferencia();
+            }
+        } else {
+            dirServicio = afiliado.getDireccion();
+            distServicio = afiliado.getDistrito();
+            refServicio = afiliado.getReferencia();
+        }
+
         LocalDateTime fechaAsignacion = LocalDateTime.now(ZONA_PERU);
         String codigoOrden = generarCorrelativoAnual(fechaAsignacion.getYear());
 
@@ -83,6 +139,9 @@ public class OrdenServicioService implements IOrdenServicioService {
                 .tipoServicio(request.getTipoServicio())
                 .estado(EstadoOrden.PENDIENTE)
                 .afiliado(afiliado)
+                .direccionServicio(dirServicio)
+                .distritoServicio(distServicio)
+                .referenciaServicio(refServicio)
                 .tecnico(tecnico)
                 .fechaAsignacion(fechaAsignacion)
                 .build();
@@ -102,11 +161,13 @@ public class OrdenServicioService implements IOrdenServicioService {
             return;
         }
         try {
-            String distrito = (orden.getAfiliado() != null && orden.getAfiliado().getDistrito() != null)
-                    ? orden.getAfiliado().getDistrito()
+            String distritoEfectivo = orden.obtenerDistritoEfectivo();
+            String distrito = (distritoEfectivo != null && !distritoEfectivo.isBlank())
+                    ? distritoEfectivo
                     : "Lima";
-            String direccion = (orden.getAfiliado() != null && orden.getAfiliado().getDireccion() != null && !orden.getAfiliado().getDireccion().isBlank())
-                    ? orden.getAfiliado().getDireccion()
+            String direccionEfectiva = orden.obtenerDireccionEfectiva();
+            String direccion = (direccionEfectiva != null && !direccionEfectiva.isBlank())
+                    ? direccionEfectiva
                     : distrito;
             oneSignalPushService.enviarNotificacionAsignacion(
                     orden.getId(),
