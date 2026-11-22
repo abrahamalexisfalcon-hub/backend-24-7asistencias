@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,6 +31,7 @@ public class CrearTecnicoRequest {
     @Pattern(regexp = "^[0-9]{9,15}$", message = "El teléfono debe contener solo números (9 dígitos)")
     private String telefono;
 
-    @NotBlank(message = "La especialidad es obligatoria")
     private String especialidad;
+    private List<Long> especialidadIds;
+    private List<String> especialidades;
 }

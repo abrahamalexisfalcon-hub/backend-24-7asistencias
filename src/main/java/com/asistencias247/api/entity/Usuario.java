@@ -1,7 +1,16 @@
 package com.asistencias247.api.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "usuarios")
@@ -42,6 +51,17 @@ public class Usuario {
     @Column(name = "firma_url", length = 500)
     private String firmaUrl;
 
-    @Column(length = 100)
+    @Column(length = 500)
     private String especialidad;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "usuario_especialidades",
+        joinColumns = @JoinColumn(name = "usuario_id"),
+        inverseJoinColumns = @JoinColumn(name = "especialidad_id")
+    )
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Especialidad> especialidades = new HashSet<>();
 }

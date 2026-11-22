@@ -1,9 +1,11 @@
 package com.asistencias247.api.config;
 
 import com.asistencias247.api.entity.Cuenta;
+import com.asistencias247.api.entity.Especialidad;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.repository.CuentaRepository;
+import com.asistencias247.api.repository.EspecialidadRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -21,6 +25,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
     private final CuentaRepository cuentaRepository;
+    private final EspecialidadRepository especialidadRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -90,6 +95,39 @@ public class DataSeeder implements CommandLineRunner {
                         .build());
             }
             log.info("Cuentas aseguradoras iniciales registradas: {}", cuentasBase);
+        }
+
+        // Migración automática: vincular especialidades de texto legado hacia tabla intermedia usuario_especialidades
+        try {
+            List<Usuario> tecnicos = usuarioRepository.findByRolOrderByNombreCompletoAsc(RolUsuario.TECNICO);
+            int migrados = 0;
+            for (Usuario u : tecnicos) {
+                if ((u.getEspecialidades() == null || u.getEspecialidades().isEmpty())
+                        && u.getEspecialidad() != null && !u.getEspecialidad().isBlank()) {
+                    Set<Especialidad> especialidadesResueltas = new LinkedHashSet<>();
+                    for (String parte : u.getEspecialidad().split(",")) {
+                        String nombre = parte.trim();
+                        if (!nombre.isEmpty()) {
+                            especialidadRepository.findByNombreIgnoreCase(nombre)
+                                    .ifPresent(especialidadesResueltas::add);
+                        }
+                    }
+                    if (!especialidadesResueltas.isEmpty()) {
+                        if (u.getEspecialidades() == null) {
+                            u.setEspecialidades(especialidadesResueltas);
+                        } else {
+                            u.getEspecialidades().addAll(especialidadesResueltas);
+                        }
+                        usuarioRepository.save(u);
+                        migrados++;
+                    }
+                }
+            }
+            if (migrados > 0) {
+                log.info("Migración automática de especialidades completada para {} técnico(s).", migrados);
+            }
+        } catch (Exception e) {
+            log.warn("No se pudo completar la migración automática de especialidades de técnicos: {}", e.getMessage());
         }
 
         log.info("Inicialización completada. No se generan datos simulados ni de prueba (modo base de datos en limpio).");

@@ -6,10 +6,12 @@ import com.asistencias247.api.dto.ActualizarTecnicoRequest;
 import com.asistencias247.api.dto.CrearTecnicoRequest;
 import com.asistencias247.api.dto.PerfilTecnicoDto;
 import com.asistencias247.api.dto.TecnicoResumenDto;
+import com.asistencias247.api.entity.Especialidad;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
 import com.asistencias247.api.exception.RecursoNoEncontradoException;
+import com.asistencias247.api.repository.EspecialidadRepository;
 import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -29,10 +35,13 @@ import java.util.List;
 public class TecnicoService {
 
     private final UsuarioRepository usuarioRepository;
+    private final EspecialidadRepository especialidadRepository;
     private final OrdenServicioRepository ordenServicioRepository;
     private final StorageService storageService;
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate transactionTemplate;
+
+    private record EspecialidadesResueltas(Set<Especialidad> entidades, List<String> nombres) {}
 
     @Transactional(readOnly = true)
     public List<TecnicoResumenDto> listarTecnicos(Boolean soloActivos) {
@@ -72,6 +81,17 @@ public class TecnicoService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe un usuario registrado con el número de celular: " + telefonoLimpio);
         }
 
+        EspecialidadesResueltas resueltas = resolverEspecialidades(
+                request.getEspecialidadIds(),
+                request.getEspecialidades(),
+                request.getEspecialidad()
+        );
+        if (resueltas.entidades().isEmpty()) {
+            throw new IllegalArgumentException("Debe seleccionar al menos una especialidad para el técnico.");
+        }
+
+        String nombresUnidos = String.join(", ", resueltas.nombres());
+
         Usuario tecnico = Usuario.builder()
                 .nombreCompleto(request.getNombreCompleto().trim())
                 .correo(correoLimpio)
@@ -80,7 +100,8 @@ public class TecnicoService {
                 .rol(RolUsuario.TECNICO)
                 .activo(true)
                 .disponible(true)
-                .especialidad(request.getEspecialidad().trim())
+                .especialidad(nombresUnidos)
+                .especialidades(resueltas.entidades())
                 .build();
 
         Usuario guardado = usuarioRepository.save(tecnico);
@@ -140,9 +161,23 @@ public class TecnicoService {
             }
             tecnico.setTelefono(telLimpio);
         }
-        if (request.getEspecialidad() != null && !request.getEspecialidad().isBlank()) {
-            tecnico.setEspecialidad(request.getEspecialidad().trim());
+
+        boolean tieneEspecialidades = (request.getEspecialidadIds() != null && !request.getEspecialidadIds().isEmpty())
+                || (request.getEspecialidades() != null && !request.getEspecialidades().isEmpty())
+                || (request.getEspecialidad() != null && !request.getEspecialidad().isBlank());
+        if (tieneEspecialidades) {
+            EspecialidadesResueltas resueltas = resolverEspecialidades(
+                    request.getEspecialidadIds(),
+                    request.getEspecialidades(),
+                    request.getEspecialidad()
+            );
+            if (resueltas.entidades().isEmpty()) {
+                throw new IllegalArgumentException("Debe seleccionar al menos una especialidad válida para el técnico.");
+            }
+            tecnico.setEspecialidades(resueltas.entidades());
+            tecnico.setEspecialidad(String.join(", ", resueltas.nombres()));
         }
+
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             String pinLimpio = request.getPassword().trim();
             if (!pinLimpio.matches("^\\d{4}$")) {
@@ -156,13 +191,149 @@ public class TecnicoService {
         return mapearATecnicoResumen(guardado);
     }
 
+    private EspecialidadesResueltas resolverEspecialidades(
+            List<Long> especialidadIds,
+            List<String> especialidadesNombres,
+            String especialidadSimple) {
+
+        Set<Especialidad> resultado = new LinkedHashSet<>();
+
+        if (especialidadIds != null && !especialidadIds.isEmpty()) {
+            List<Long> idsValidos = especialidadIds.stream()
+                    .filter(Objects::nonNull)
+                    .toList();
+            if (!idsValidos.isEmpty()) {
+                List<Especialidad> encontradas = especialidadRepository.findAllById(idsValidos);
+                for (Long idBuscado : idsValidos) {
+                    encontradas.stream()
+                            .filter(e -> idBuscado.equals(e.getId()))
+                            .findFirst()
+                            .ifPresent(e -> agregarEspecialidadSinDuplicados(resultado, e));
+                }
+                for (Especialidad esp : encontradas) {
+                    if (esp.getId() == null) {
+                        agregarEspecialidadSinDuplicados(resultado, esp);
+                    }
+                }
+            }
+        }
+
+        if (especialidadesNombres != null && !especialidadesNombres.isEmpty()) {
+            for (String item : especialidadesNombres) {
+                if (item == null) {
+                    continue;
+                }
+                for (String parte : item.split(",")) {
+                    String nombreLimpio = parte.trim();
+                    if (!nombreLimpio.isEmpty()) {
+                        Especialidad esp = buscarOCrearEspecialidad(nombreLimpio);
+                        agregarEspecialidadSinDuplicados(resultado, esp);
+                    }
+                }
+            }
+        }
+
+        if (resultado.isEmpty() && especialidadSimple != null && !especialidadSimple.isBlank()) {
+            for (String parte : especialidadSimple.split(",")) {
+                String nombreLimpio = parte.trim();
+                if (!nombreLimpio.isEmpty()) {
+                    Especialidad esp = buscarOCrearEspecialidad(nombreLimpio);
+                    agregarEspecialidadSinDuplicados(resultado, esp);
+                }
+            }
+        }
+
+        List<String> nombres = resultado.stream()
+                .map(Especialidad::getNombre)
+                .filter(n -> n != null && !n.isBlank())
+                .map(String::trim)
+                .toList();
+
+        return new EspecialidadesResueltas(resultado, nombres);
+    }
+
+    private Especialidad buscarOCrearEspecialidad(String nombre) {
+        return especialidadRepository.findByNombreIgnoreCase(nombre)
+                .orElseGet(() -> {
+                    Especialidad nueva = Especialidad.builder()
+                            .nombre(nombre)
+                            .activo(true)
+                            .build();
+                    Especialidad guardada = especialidadRepository.save(nueva);
+                    return guardada != null ? guardada : nueva;
+                });
+    }
+
+    private void agregarEspecialidadSinDuplicados(Set<Especialidad> set, Especialidad candidata) {
+        if (candidata == null) {
+            return;
+        }
+        boolean yaExiste = set.stream().anyMatch(e ->
+                (e.getId() != null && candidata.getId() != null && e.getId().equals(candidata.getId()))
+                        || (e.getNombre() != null && candidata.getNombre() != null
+                        && e.getNombre().trim().equalsIgnoreCase(candidata.getNombre().trim()))
+        );
+        if (!yaExiste) {
+            set.add(candidata);
+        }
+    }
+
     private TecnicoResumenDto mapearATecnicoResumen(Usuario u) {
+        List<Long> especialidadIds;
+        List<String> especialidades;
+        String especialidad;
+
+        if (u.getEspecialidades() != null && !u.getEspecialidades().isEmpty()) {
+            especialidadIds = u.getEspecialidades().stream()
+                    .map(Especialidad::getId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            especialidades = u.getEspecialidades().stream()
+                    .map(Especialidad::getNombre)
+                    .filter(n -> n != null && !n.isBlank())
+                    .map(String::trim)
+                    .toList();
+            if (!especialidades.isEmpty()) {
+                especialidad = String.join(", ", especialidades);
+            } else if (u.getEspecialidad() != null && !u.getEspecialidad().isBlank()) {
+                especialidades = Arrays.stream(u.getEspecialidad().split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toList();
+                especialidad = especialidades.isEmpty() ? "General" : u.getEspecialidad();
+                if (especialidades.isEmpty()) {
+                    especialidades = List.of("General");
+                }
+            } else {
+                especialidad = "General";
+                especialidades = List.of("General");
+            }
+        } else if (u.getEspecialidad() != null && !u.getEspecialidad().isBlank()) {
+            especialidades = Arrays.stream(u.getEspecialidad().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+            especialidadIds = List.of();
+            if (especialidades.isEmpty()) {
+                especialidad = "General";
+                especialidades = List.of("General");
+            } else {
+                especialidad = u.getEspecialidad();
+            }
+        } else {
+            especialidad = "General";
+            especialidades = List.of("General");
+            especialidadIds = List.of();
+        }
+
         return TecnicoResumenDto.builder()
                 .id(u.getId())
                 .nombreCompleto(u.getNombreCompleto())
                 .correo(u.getCorreo())
                 .telefono(u.getTelefono())
-                .especialidad(u.getEspecialidad() != null ? u.getEspecialidad() : "General")
+                .especialidad(especialidad)
+                .especialidadIds(especialidadIds)
+                .especialidades(especialidades)
                 .activo(Boolean.TRUE.equals(u.getActivo()))
                 .disponible(Boolean.TRUE.equals(u.getDisponible()))
                 .build();
