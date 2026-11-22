@@ -53,7 +53,7 @@ public class DataSeeder implements CommandLineRunner {
                         admin.setRol(RolUsuario.ADMINISTRADOR);
                         modificado = true;
                     }
-                    if (!passwordEncoder.matches("admin123", admin.getPassword())) {
+                    if (admin.getPassword() == null || admin.getPassword().isBlank()) {
                         admin.setPassword(passwordEncoder.encode("admin123"));
                         modificado = true;
                     }

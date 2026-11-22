@@ -1,9 +1,12 @@
 package com.asistencias247.api.service;
 
+import com.asistencias247.api.config.DataSeeder;
+import com.asistencias247.api.controller.AdminPerfilController;
 import com.asistencias247.api.dto.ActualizarCuentaRequest;
 import com.asistencias247.api.dto.ActualizarEspecialidadRequest;
 import com.asistencias247.api.dto.AuthRequestDto;
 import com.asistencias247.api.dto.AuthResponseDto;
+import com.asistencias247.api.dto.CambiarPasswordAdminRequest;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
 import com.asistencias247.api.dto.CierreHojaServicioRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
@@ -41,6 +44,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -449,5 +454,174 @@ class CoreServicesUnitTests {
         assertEquals(HttpStatus.BAD_REQUEST, illResp.getStatusCode());
         assertNotNull(illResp.getBody());
         assertEquals("Debe seleccionar al menos una especialidad para el técnico.", illResp.getBody().getMessage());
+    }
+
+    // ─── 7. PRUEBAS DE CAMBIO DE CONTRASEÑA ADMIN & DATASEEDER ────────────
+
+    @Test
+    @DisplayName("AdminPerfilController debe actualizar el hash BCrypt cuando la contraseña actual es correcta")
+    void adminPerfilController_debeActualizarPasswordCuandoActualEsCorrecta() {
+        PasswordEncoder encoder = new BCryptPasswordEncoder();
+        AdminPerfilService adminPerfilService = new AdminPerfilService(usuarioRepository, encoder);
+        AdminPerfilController controller = new AdminPerfilController(adminPerfilService);
+
+        String correo = "admin@asistencias247.com";
+        String hashInicial = encoder.encode("admin123");
+        Usuario admin = Usuario.builder()
+                .id(1L)
+                .nombreCompleto("Administrador del Sistema")
+                .correo(correo)
+                .password(hashInicial)
+                .rol(RolUsuario.ADMINISTRADOR)
+                .activo(true)
+                .build();
+
+        when(usuarioRepository.findByCorreo(correo)).thenReturn(Optional.of(admin));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                correo, null, List.of(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR")));
+        CambiarPasswordAdminRequest req = CambiarPasswordAdminRequest.builder()
+                .passwordActual("admin123")
+                .nuevaPassword("NuevaClave2026!")
+                .confirmarPassword("NuevaClave2026!")
+                .build();
+
+        var response = controller.cambiarPassword(auth, req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Contraseña actualizada correctamente", response.getBody().get("mensaje"));
+        assertNotEquals(hashInicial, admin.getPassword());
+        assertTrue(encoder.matches("NuevaClave2026!", admin.getPassword()));
+        verify(usuarioRepository).save(admin);
+    }
+
+    @Test
+    @DisplayName("AdminPerfilService debe lanzar 400 BAD_REQUEST cuando la contraseña actual es incorrecta")
+    void adminPerfilService_debeRechazarPasswordActualIncorrectaCon400() {
+        PasswordEncoder encoder = new BCryptPasswordEncoder();
+        AdminPerfilService adminPerfilService = new AdminPerfilService(usuarioRepository, encoder);
+
+        Usuario admin = Usuario.builder()
+                .id(1L)
+                .correo("admin@asistencias247.com")
+                .password(encoder.encode("admin123"))
+                .rol(RolUsuario.ADMINISTRADOR)
+                .build();
+
+        when(usuarioRepository.findByCorreo("admin@asistencias247.com")).thenReturn(Optional.of(admin));
+
+        CambiarPasswordAdminRequest req = CambiarPasswordAdminRequest.builder()
+                .passwordActual("claveIncorrecta")
+                .nuevaPassword("NuevaClave2026!")
+                .confirmarPassword("NuevaClave2026!")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> adminPerfilService.cambiarPassword("admin@asistencias247.com", req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("La contraseña actual ingresada es incorrecta.", ex.getReason());
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("AdminPerfilService debe lanzar 400 BAD_REQUEST cuando la nueva contraseña es igual a la actual")
+    void adminPerfilService_debeRechazarNuevaPasswordIgualAActualCon400() {
+        PasswordEncoder encoder = new BCryptPasswordEncoder();
+        AdminPerfilService adminPerfilService = new AdminPerfilService(usuarioRepository, encoder);
+
+        Usuario admin = Usuario.builder()
+                .id(1L)
+                .correo("admin@asistencias247.com")
+                .password(encoder.encode("admin123"))
+                .rol(RolUsuario.ADMINISTRADOR)
+                .build();
+
+        when(usuarioRepository.findByCorreo("admin@asistencias247.com")).thenReturn(Optional.of(admin));
+
+        CambiarPasswordAdminRequest req = CambiarPasswordAdminRequest.builder()
+                .passwordActual("admin123")
+                .nuevaPassword("admin123")
+                .confirmarPassword("admin123")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> adminPerfilService.cambiarPassword("admin@asistencias247.com", req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("La nueva contraseña debe ser diferente a la contraseña actual.", ex.getReason());
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("AdminPerfilService debe validar confirmación no coincidente y usuario inexistente")
+    void adminPerfilService_debeValidarConfirmacionYUsuarioExistente() {
+        PasswordEncoder encoder = new BCryptPasswordEncoder();
+        AdminPerfilService adminPerfilService = new AdminPerfilService(usuarioRepository, encoder);
+
+        Usuario admin = Usuario.builder()
+                .id(1L)
+                .correo("admin@asistencias247.com")
+                .password(encoder.encode("admin123"))
+                .rol(RolUsuario.ADMINISTRADOR)
+                .build();
+
+        when(usuarioRepository.findByCorreo("admin@asistencias247.com")).thenReturn(Optional.of(admin));
+
+        CambiarPasswordAdminRequest reqNoCoincide = CambiarPasswordAdminRequest.builder()
+                .passwordActual("admin123")
+                .nuevaPassword("NuevaClave2026!")
+                .confirmarPassword("OtraClave2026!")
+                .build();
+
+        ResponseStatusException mismatchEx = assertThrows(ResponseStatusException.class,
+                () -> adminPerfilService.cambiarPassword("admin@asistencias247.com", reqNoCoincide));
+        assertEquals(HttpStatus.BAD_REQUEST, mismatchEx.getStatusCode());
+        assertEquals("La confirmación de la nueva contraseña no coincide.", mismatchEx.getReason());
+
+        when(usuarioRepository.findByCorreo("inexistente@asistencias247.com")).thenReturn(Optional.empty());
+        ResponseStatusException notFoundEx = assertThrows(ResponseStatusException.class,
+                () -> adminPerfilService.cambiarPassword("inexistente@asistencias247.com", reqNoCoincide));
+        assertEquals(HttpStatus.NOT_FOUND, notFoundEx.getStatusCode());
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("DataSeeder no debe sobrescribir la contraseña personalizada del administrador al reiniciar")
+    void dataSeeder_noDebeSobrescribirPasswordPersonalizadaDeAdmin() {
+        PasswordEncoder encoder = new BCryptPasswordEncoder();
+        var espRepo = mock(com.asistencias247.api.repository.EspecialidadRepository.class);
+        DataSeeder seeder = new DataSeeder(
+                usuarioRepository,
+                cuentaRepository,
+                espRepo,
+                afiliadoRepository,
+                ordenServicioRepository,
+                encoder
+        );
+
+        String customHash = encoder.encode("MiClavePersonalizada2026");
+        Usuario admin = Usuario.builder()
+                .id(1L)
+                .correo("admin@asistencias247.com")
+                .password(customHash)
+                .rol(RolUsuario.ADMINISTRADOR)
+                .activo(true)
+                .build();
+
+        when(usuarioRepository.findByCorreo("admin@asistencias247.com")).thenReturn(Optional.of(admin));
+        when(usuarioRepository.findByCorreo("tecnico@asistencias247.com")).thenReturn(Optional.empty());
+        when(cuentaRepository.count()).thenReturn(5L);
+        when(usuarioRepository.findByRolOrderByNombreCompletoAsc(RolUsuario.TECNICO)).thenReturn(List.of());
+        when(afiliadoRepository.findAll()).thenReturn(List.of());
+        when(ordenServicioRepository.findAll()).thenReturn(List.of());
+
+        seeder.run();
+
+        assertEquals(customHash, admin.getPassword());
+        assertTrue(encoder.matches("MiClavePersonalizada2026", admin.getPassword()));
+        verify(usuarioRepository, never()).save(admin);
     }
 }
