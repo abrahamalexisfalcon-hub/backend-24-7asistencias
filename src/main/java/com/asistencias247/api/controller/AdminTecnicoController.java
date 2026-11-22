@@ -33,10 +33,10 @@ public class AdminTecnicoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(nuevo);
     }
 
-    @PatchMapping("/{id}/estado")
+    @RequestMapping(value = "/{id}/estado", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<TecnicoResumenDto> actualizarEstadoTecnico(
             @PathVariable Long id,
-            @Valid @RequestBody ActualizarEstadoTecnicoRequest request) {
+            @RequestBody(required = false) ActualizarEstadoTecnicoRequest request) {
         TecnicoResumenDto actualizado = tecnicoService.actualizarEstadoTecnico(id, request);
         return ResponseEntity.ok(actualizado);
     }

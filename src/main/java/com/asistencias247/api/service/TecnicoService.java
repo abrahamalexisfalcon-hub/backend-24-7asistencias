@@ -62,11 +62,13 @@ public class TecnicoService {
     @Transactional
     public TecnicoResumenDto crearTecnico(CrearTecnicoRequest request) {
         String correoLimpio = request.getCorreo().trim().toLowerCase();
-        String telefonoLimpio = request.getTelefono().replaceAll("\\D", "");
-        String pinLimpio = request.getPassword().trim();
+        String telefonoLimpio = request.getTelefono() != null
+                ? request.getTelefono().trim().replaceAll("\\s+", "")
+                : "";
+        String pinLimpio = request.getPassword() != null ? request.getPassword().trim() : "";
 
-        if (telefonoLimpio.length() < 9) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de teléfono debe tener al menos 9 dígitos numéricos.");
+        if (!telefonoLimpio.matches("^\\d{9}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de celular debe contener exactamente 9 dígitos numéricos.");
         }
 
         if (!pinLimpio.matches("^\\d{4}$")) {
@@ -118,7 +120,9 @@ public class TecnicoService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El usuario especificado no tiene rol de técnico.");
         }
 
-        boolean nuevoEstado = Boolean.TRUE.equals(request.getActivo());
+        boolean nuevoEstado = (request == null || request.getActivo() == null)
+                ? !Boolean.TRUE.equals(tecnico.getActivo())
+                : Boolean.TRUE.equals(request.getActivo());
         tecnico.setActivo(nuevoEstado);
         if (!nuevoEstado) {
             tecnico.setDisponible(false);
@@ -152,9 +156,9 @@ public class TecnicoService {
             tecnico.setCorreo(correoLimpio);
         }
         if (request.getTelefono() != null && !request.getTelefono().isBlank()) {
-            String telLimpio = request.getTelefono().replaceAll("\\D", "");
-            if (telLimpio.length() < 9) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de teléfono debe tener al menos 9 dígitos numéricos.");
+            String telLimpio = request.getTelefono().trim().replaceAll("\\s+", "");
+            if (!telLimpio.matches("^\\d{9}$")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de celular debe contener exactamente 9 dígitos numéricos.");
             }
             if (usuarioRepository.existsByTelefonoAndIdNot(telLimpio, id)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otro usuario registrado con el número de celular: " + telLimpio);

@@ -19,8 +19,9 @@ public class AdminEspecialidadController {
     private final EspecialidadService especialidadService;
 
     @GetMapping
-    public ResponseEntity<List<EspecialidadDto>> listarEspecialidades() {
-        return ResponseEntity.ok(especialidadService.listarActivas());
+    public ResponseEntity<List<EspecialidadDto>> listarEspecialidades(
+            @RequestParam(name = "todas", required = false, defaultValue = "false") boolean todas) {
+        return ResponseEntity.ok(todas ? especialidadService.listarTodas() : especialidadService.listarActivas());
     }
 
     @PostMapping
@@ -33,6 +34,11 @@ public class AdminEspecialidadController {
             @PathVariable Long id,
             @Valid @RequestBody com.asistencias247.api.dto.ActualizarEspecialidadRequest request) {
         return ResponseEntity.ok(especialidadService.actualizarEspecialidad(id, request));
+    }
+
+    @RequestMapping(value = "/{id}/toggle", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<EspecialidadDto> toggleEspecialidad(@PathVariable Long id) {
+        return ResponseEntity.ok(especialidadService.toggleEstadoEspecialidad(id));
     }
 
     @DeleteMapping("/{id}")

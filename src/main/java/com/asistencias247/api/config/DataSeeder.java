@@ -138,11 +138,21 @@ public class DataSeeder implements CommandLineRunner {
             log.warn("No se pudo completar la migración automática de especialidades de técnicos: {}", e.getMessage());
         }
 
-        // Migración automática: crear dirección Principal en afiliado_direcciones para afiliados existentes sin direcciones
+        // Migración automática: normalizar DNIs > 8 dígitos y crear dirección Principal para afiliados existentes
         try {
             List<Afiliado> afiliados = afiliadoRepository.findAll();
             int afiliadosMigrados = 0;
+            int dnisNormalizados = 0;
             for (Afiliado a : afiliados) {
+                boolean modificado = false;
+                if (a.getDni() != null && !a.getDni().isBlank()) {
+                    String soloDigitos = a.getDni().replaceAll("\\D", "");
+                    if (soloDigitos.length() > 8) {
+                        a.setDni(soloDigitos.substring(0, 8));
+                        modificado = true;
+                        dnisNormalizados++;
+                    }
+                }
                 if ((a.getDirecciones() == null || a.getDirecciones().isEmpty())
                         && a.getDireccion() != null && !a.getDireccion().isBlank()) {
                     if (a.getDirecciones() == null) {
@@ -157,15 +167,21 @@ public class DataSeeder implements CommandLineRunner {
                             .esPrincipal(true)
                             .build();
                     a.getDirecciones().add(dirPrincipal);
-                    afiliadoRepository.save(a);
+                    modificado = true;
                     afiliadosMigrados++;
                 }
+                if (modificado) {
+                    afiliadoRepository.save(a);
+                }
+            }
+            if (dnisNormalizados > 0) {
+                log.info("Normalización automática de DNI (>8 dígitos) completada para {} afiliado(s).", dnisNormalizados);
             }
             if (afiliadosMigrados > 0) {
                 log.info("Migración automática de direcciones completada para {} afiliado(s).", afiliadosMigrados);
             }
         } catch (Exception e) {
-            log.warn("No se pudo completar la migración automática de direcciones de afiliados: {}", e.getMessage());
+            log.warn("No se pudo completar la migración automática de afiliados: {}", e.getMessage());
         }
 
         // Migración automática: snapshot de dirección en órdenes existentes sin direccion_servicio

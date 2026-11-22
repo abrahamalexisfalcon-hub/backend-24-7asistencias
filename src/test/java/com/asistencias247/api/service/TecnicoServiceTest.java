@@ -16,8 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -227,5 +229,67 @@ class TecnicoServiceTest {
         assertEquals("General", lista.get(1).getEspecialidad());
         assertEquals(List.of("General"), lista.get(1).getEspecialidades());
         assertTrue(lista.get(1).getEspecialidadIds().isEmpty());
+    }
+
+    @Test
+    @DisplayName("crearTecnico y actualizarTecnico deben exigir celular de exactamente 9 dígitos numéricos")
+    void crearYActualizarTecnico_celularInvalido_debeLanzarBadRequest() {
+        CrearTecnicoRequest crearReq = CrearTecnicoRequest.builder()
+                .nombreCompleto("Pedro Cell")
+                .correo("pedro.cell@asistencias247.com")
+                .telefono("9876543210")
+                .password("1234")
+                .especialidad("Gasfitería")
+                .build();
+
+        ResponseStatusException crearEx = assertThrows(ResponseStatusException.class,
+                () -> tecnicoService.crearTecnico(crearReq));
+        assertEquals(HttpStatus.BAD_REQUEST, crearEx.getStatusCode());
+        assertEquals("El número de celular debe contener exactamente 9 dígitos numéricos.", crearEx.getReason());
+
+        Usuario existente = Usuario.builder()
+                .id(40L)
+                .nombreCompleto("Mario Vega")
+                .correo("mario@asistencias247.com")
+                .telefono("900111222")
+                .rol(RolUsuario.TECNICO)
+                .activo(true)
+                .build();
+
+        when(usuarioRepository.findById(40L)).thenReturn(Optional.of(existente));
+
+        ActualizarTecnicoRequest actualizarReq = ActualizarTecnicoRequest.builder()
+                .telefono("12345")
+                .build();
+
+        ResponseStatusException updEx = assertThrows(ResponseStatusException.class,
+                () -> tecnicoService.actualizarTecnico(40L, actualizarReq));
+        assertEquals(HttpStatus.BAD_REQUEST, updEx.getStatusCode());
+        assertEquals("El número de celular debe contener exactamente 9 dígitos numéricos.", updEx.getReason());
+    }
+
+    @Test
+    @DisplayName("actualizarEstadoTecnico sin body o con activo=null debe invertir el estado del técnico")
+    void actualizarEstadoTecnico_sinActivo_debeHacerToggle() {
+        Usuario tecnico = Usuario.builder()
+                .id(50L)
+                .nombreCompleto("Luis Estado")
+                .correo("luis.estado@asistencias247.com")
+                .telefono("988777666")
+                .rol(RolUsuario.TECNICO)
+                .activo(true)
+                .disponible(true)
+                .especialidad("Gasfitería")
+                .build();
+
+        when(usuarioRepository.findById(50L)).thenReturn(Optional.of(tecnico));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TecnicoResumenDto desactivado = tecnicoService.actualizarEstadoTecnico(50L, null);
+        assertFalse(desactivado.getActivo());
+        assertFalse(desactivado.getDisponible());
+
+        TecnicoResumenDto reactivado = tecnicoService.actualizarEstadoTecnico(50L, new com.asistencias247.api.dto.ActualizarEstadoTecnicoRequest(null));
+        assertTrue(reactivado.getActivo());
     }
 }

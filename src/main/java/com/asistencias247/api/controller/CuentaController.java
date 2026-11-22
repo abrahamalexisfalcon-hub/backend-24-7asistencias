@@ -38,9 +38,19 @@ public class CuentaController {
         return ResponseEntity.ok(cuentaService.actualizarCuenta(id, request));
     }
 
-    @PatchMapping("/{id}/toggle")
+    @RequestMapping(value = "/{id}/toggle", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<CuentaDto> toggleCuenta(@PathVariable Long id) {
         return ResponseEntity.ok(cuentaService.toggleEstadoCuenta(id));
+    }
+
+    @RequestMapping(value = "/{id}/estado", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<CuentaDto> actualizarEstadoCuenta(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        Boolean activo = (body != null && body.containsKey("activo"))
+                ? Boolean.TRUE.equals(body.get("activo"))
+                : null;
+        return ResponseEntity.ok(cuentaService.actualizarEstadoCuenta(id, activo));
     }
 
     @DeleteMapping("/{id}")

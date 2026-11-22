@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -106,7 +108,7 @@ class AfiliadoDireccionSnapshotTests {
                 .build();
 
         when(afiliadoRepository.existsByDniAndActivoTrue("44556677")).thenReturn(false);
-        when(afiliadoRepository.findByDni("44556677")).thenReturn(Optional.empty());
+        when(afiliadoRepository.findAllByDniOrderByIdDesc("44556677")).thenReturn(List.of());
         when(afiliadoRepository.save(any(Afiliado.class))).thenAnswer(inv -> {
             Afiliado a = inv.getArgument(0);
             a.setId(1L);
@@ -134,7 +136,7 @@ class AfiliadoDireccionSnapshotTests {
                 .build();
 
         when(afiliadoRepository.existsByDniAndActivoTrue("11223344")).thenReturn(false);
-        when(afiliadoRepository.findByDni("11223344")).thenReturn(Optional.empty());
+        when(afiliadoRepository.findAllByDniOrderByIdDesc("11223344")).thenReturn(List.of());
         when(afiliadoRepository.save(any(Afiliado.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Afiliado creado = afiliadoService.crearAfiliado(req);
@@ -320,5 +322,71 @@ class AfiliadoDireccionSnapshotTests {
         assertEquals("Calle Nueva 777", agregada.getDireccion());
         assertFalse(agregada.getEsPrincipal());
         verify(afiliadoRepository, times(1)).save(afiliado);
+    }
+
+    @Test
+    @DisplayName("crearAfiliado debe rechazar DNI distinto de 8 dígitos numéricos")
+    void crearAfiliado_dniInvalido_debeLanzarBadRequest() {
+        CrearAfiliadoRequest req = CrearAfiliadoRequest.builder()
+                .nombreCompleto("Carlos Pérez")
+                .dni("865616768955888")
+                .telefono("987654321")
+                .direccion("Av. Lima 123")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> afiliadoService.crearAfiliado(req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El DNI debe contener exactamente 8 dígitos numéricos.", ex.getReason());
+        verify(afiliadoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("crearAfiliado debe rechazar celular distinto de 9 dígitos numéricos")
+    void crearAfiliado_telefonoInvalido_debeLanzarBadRequest() {
+        CrearAfiliadoRequest req = CrearAfiliadoRequest.builder()
+                .nombreCompleto("Carlos Pérez")
+                .dni("12345678")
+                .telefono("98765432")
+                .direccion("Av. Lima 123")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> afiliadoService.crearAfiliado(req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El número de celular debe contener exactamente 9 dígitos numéricos.", ex.getReason());
+        verify(afiliadoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("actualizarAfiliado debe validar DNI de 8 dígitos, normalizar celular de 9 dígitos y tolerar duplicados históricos")
+    void actualizarAfiliado_conDniYTelefonoValidos_normalizaYValidaDuplicados() {
+        Afiliado existente = Afiliado.builder()
+                .id(5L)
+                .nombreCompleto("Ana Ruiz")
+                .dni("22334455")
+                .numeroCuenta("CTA-22334455")
+                .direccion("Dir Antigua")
+                .distrito("Lima")
+                .direcciones(new ArrayList<>())
+                .build();
+
+        ActualizarAfiliadoRequest req = ActualizarAfiliadoRequest.builder()
+                .nombreCompleto("Ana Ruiz")
+                .dni("87654321")
+                .telefono("987 654 321")
+                .direccion("Dir Nueva")
+                .build();
+
+        when(afiliadoRepository.findById(5L)).thenReturn(Optional.of(existente));
+        when(afiliadoRepository.findAllByDniAndActivoTrue("87654321")).thenReturn(List.of());
+        when(afiliadoRepository.save(any(Afiliado.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Afiliado actualizado = afiliadoService.actualizarAfiliado(5L, req);
+
+        assertEquals("87654321", actualizado.getDni());
+        assertEquals("987654321", actualizado.getTelefono());
     }
 }

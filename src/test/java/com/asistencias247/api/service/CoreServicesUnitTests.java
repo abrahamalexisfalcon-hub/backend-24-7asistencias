@@ -1,16 +1,24 @@
 package com.asistencias247.api.service;
 
+import com.asistencias247.api.dto.ActualizarCuentaRequest;
+import com.asistencias247.api.dto.ActualizarEspecialidadRequest;
 import com.asistencias247.api.dto.AuthRequestDto;
 import com.asistencias247.api.dto.AuthResponseDto;
 import com.asistencias247.api.dto.CancelarOrdenRequest;
+import com.asistencias247.api.dto.CierreHojaServicioRequest;
 import com.asistencias247.api.dto.CrearOrdenRequest;
+import com.asistencias247.api.dto.CuentaDto;
+import com.asistencias247.api.dto.ErrorResponseDto;
+import com.asistencias247.api.dto.EspecialidadDto;
 import com.asistencias247.api.dto.OrdenDetalleAdminDto;
 import com.asistencias247.api.entity.Afiliado;
 import com.asistencias247.api.entity.Cuenta;
+import com.asistencias247.api.entity.Especialidad;
 import com.asistencias247.api.entity.EstadoOrden;
 import com.asistencias247.api.entity.OrdenServicio;
 import com.asistencias247.api.entity.RolUsuario;
 import com.asistencias247.api.entity.Usuario;
+import com.asistencias247.api.exception.GlobalExceptionHandler;
 import com.asistencias247.api.mapper.OrdenServicioMapper;
 import com.asistencias247.api.repository.AfiliadoRepository;
 import com.asistencias247.api.repository.CuentaRepository;
@@ -315,5 +323,131 @@ class CoreServicesUnitTests {
         assertDoesNotThrow(() -> service.enviarNotificacionAsignacion((OrdenServicio) null));
         assertDoesNotThrow(() -> service.enviarNotificacionAsignacion(1L, null, "ORD-2026-001", "ELECTRICIDAD", "Av. Test"));
         assertDoesNotThrow(() -> service.enviarNotificacionAsignacion(1L, 5L, "ORD-2026-001", "ELECTRICIDAD", "Av. Test"));
+    }
+
+    // ─── 4. PRUEBAS DE CUENTASERVICE (TOGGLE Y ACTUALIZACIÓN PARCIAL) ────────
+
+    @Test
+    @DisplayName("CuentaService debe permitir actualizar solo estado activo, hacer toggle y validar nombre duplicado en inactivas")
+    void cuentaService_debeActualizarYTogglearEstadoCorrectamente() {
+        CuentaService cuentaService = new CuentaService(cuentaRepository);
+
+        Cuenta rimac = Cuenta.builder().id(1L).nombre("Rímac Seguros").activo(true).build();
+        Cuenta inactiva = Cuenta.builder().id(2L).nombre("Mapfre").activo(false).build();
+
+        when(cuentaRepository.findById(1L)).thenReturn(Optional.of(rimac));
+        when(cuentaRepository.save(any(Cuenta.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 1. Toggle desde activo=true -> false
+        CuentaDto toggledOff = cuentaService.toggleEstadoCuenta(1L);
+        assertFalse(toggledOff.getActivo());
+
+        // 2. actualizarEstadoCuenta explícito a true
+        CuentaDto activada = cuentaService.actualizarEstadoCuenta(1L, true);
+        assertTrue(activada.getActivo());
+
+        // 3. actualizarCuenta enviando solo activo=false (nombre null)
+        CuentaDto soloEstado = cuentaService.actualizarCuenta(1L, ActualizarCuentaRequest.builder().activo(false).build());
+        assertFalse(soloEstado.getActivo());
+        assertEquals("Rímac Seguros", soloEstado.getNombre());
+
+        // 4. actualizarCuenta con nombre duplicado de cuenta inactiva debe lanzar BAD_REQUEST
+        when(cuentaRepository.findByNombreIgnoreCase("Mapfre")).thenReturn(Optional.of(inactiva));
+        ResponseStatusException dupEx = assertThrows(ResponseStatusException.class,
+                () -> cuentaService.actualizarCuenta(1L, ActualizarCuentaRequest.builder().nombre("Mapfre").build()));
+        assertEquals(HttpStatus.BAD_REQUEST, dupEx.getStatusCode());
+    }
+
+    // ─── 5. PRUEBAS DE HOJASERVICIOSERVICE (DNI 8 DÍGITOS) ───────────────────
+
+    @Test
+    @DisplayName("HojaServicioService debe validar que dniAfiliado tenga exactamente 8 dígitos antes de subir fotos")
+    void hojaServicioService_dniInvalido_debeFallarAntesDeSubirFotos() {
+        var hojaRepo = mock(com.asistencias247.api.repository.HojaServicioRepository.class);
+        var materialRepo = mock(com.asistencias247.api.repository.MaterialRepository.class);
+        var storageService = mock(com.asistencias247.api.service.storage.StorageService.class);
+        var txTemplate = mock(org.springframework.transaction.support.TransactionTemplate.class);
+        HojaServicioService hojaService = new HojaServicioService(
+                ordenServicioRepository,
+                hojaRepo,
+                materialRepo,
+                storageService,
+                Runnable::run,
+                txTemplate
+        );
+
+        CierreHojaServicioRequest req = CierreHojaServicioRequest.builder()
+                .fotoInicialUrl("https://res.cloudinary.com/demo/image/upload/before.jpg")
+                .fotoFinalUrl("https://res.cloudinary.com/demo/image/upload/after.jpg")
+                .dniAfiliado("1234567")
+                .build();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> hojaService.cerrarHojaServicio(99L, req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El DNI del afiliado debe contener exactamente 8 dígitos numéricos.", ex.getReason());
+        verifyNoInteractions(storageService);
+    }
+
+    // ─── 6. PRUEBAS DE ESPECIALIDADSERVICE Y GLOBALEXCEPTIONHANDLER ─────────
+
+    @Test
+    @DisplayName("EspecialidadService debe listar todas, togglear estado y rechazar duplicado con inactiva al renombrar")
+    void especialidadService_listarTodasToggleYDuplicadoInactiva() {
+        var espRepo = mock(com.asistencias247.api.repository.EspecialidadRepository.class);
+        EspecialidadService espService = new EspecialidadService(espRepo, usuarioRepository, ordenServicioRepository);
+
+        Especialidad gasfiteria = Especialidad.builder().id(1L).nombre("Gasfitería").activo(true).build();
+        Especialidad cerrajeriaInactiva = Especialidad.builder().id(2L).nombre("Cerrajería").activo(false).build();
+
+        when(espRepo.findAll(any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(cerrajeriaInactiva, gasfiteria));
+        List<EspecialidadDto> todas = espService.listarTodas();
+        assertEquals(2, todas.size());
+
+        when(espRepo.findById(1L)).thenReturn(Optional.of(gasfiteria));
+        when(espRepo.save(any(Especialidad.class))).thenAnswer(inv -> inv.getArgument(0));
+        EspecialidadDto toggled = espService.toggleEstadoEspecialidad(1L);
+        assertFalse(toggled.activo());
+
+        when(espRepo.findByNombreIgnoreCase("Cerrajería")).thenReturn(Optional.of(cerrajeriaInactiva));
+        ResponseStatusException dupEx = assertThrows(ResponseStatusException.class,
+                () -> espService.actualizarEspecialidad(1L, new ActualizarEspecialidadRequest("Cerrajería")));
+        assertEquals(HttpStatus.BAD_REQUEST, dupEx.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("GlobalExceptionHandler debe exponer mensajes limpios de validación y de IllegalArgumentException")
+    void globalExceptionHandler_debeExponerMensajesLimpios() throws NoSuchMethodException {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/admin/afiliados");
+
+        var bindingResult = new org.springframework.validation.BeanPropertyBindingResult(new Object(), "req");
+        bindingResult.addError(new org.springframework.validation.FieldError("req", "direccionValida", "La dirección es obligatoria"));
+        var method = GlobalExceptionHandler.class.getDeclaredMethod(
+                "handleBadRequestPayloadException",
+                Exception.class,
+                jakarta.servlet.http.HttpServletRequest.class
+        );
+        var methodEx = new org.springframework.web.bind.MethodArgumentNotValidException(
+                new org.springframework.core.MethodParameter(method, 0),
+                bindingResult
+        );
+
+        var valResp = handler.handleValidationExceptions(methodEx, request);
+        assertEquals(HttpStatus.BAD_REQUEST, valResp.getStatusCode());
+        ErrorResponseDto valBody = valResp.getBody();
+        assertNotNull(valBody);
+        assertEquals("La dirección es obligatoria", valBody.getMessage());
+        assertEquals(List.of("La dirección es obligatoria"), valBody.getValidaciones());
+
+        var illResp = handler.handleBadRequestPayloadException(
+                new IllegalArgumentException("Debe seleccionar al menos una especialidad para el técnico."),
+                request
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, illResp.getStatusCode());
+        assertNotNull(illResp.getBody());
+        assertEquals("Debe seleccionar al menos una especialidad para el técnico.", illResp.getBody().getMessage());
     }
 }

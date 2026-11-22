@@ -9,6 +9,7 @@ import com.asistencias247.api.repository.OrdenServicioRepository;
 import com.asistencias247.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,14 @@ public class EspecialidadService {
     @Transactional(readOnly = true)
     public List<EspecialidadDto> listarActivas() {
         return especialidadRepository.findByActivoTrueOrderByNombreAsc()
+                .stream()
+                .map(this::mapearADto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EspecialidadDto> listarTodas() {
+        return especialidadRepository.findAll(Sort.by(Sort.Direction.ASC, "nombre"))
                 .stream()
                 .map(this::mapearADto)
                 .toList();
@@ -74,10 +83,10 @@ public class EspecialidadService {
             return mapearADto(especialidadRepository.save(esp));
         }
 
-        // Validar que no exista otra especialidad activa con el mismo nombre
+        // Validar que no exista otra especialidad registrada con el mismo nombre (activa o inactiva)
         especialidadRepository.findByNombreIgnoreCase(nuevoNombre).ifPresent(existente -> {
-            if (!existente.getId().equals(id) && Boolean.TRUE.equals(existente.getActivo())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otra especialidad activa con el nombre: " + nuevoNombre);
+            if (!existente.getId().equals(id)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otra especialidad registrada con el nombre: " + nuevoNombre);
             }
         });
 
@@ -92,6 +101,16 @@ public class EspecialidadService {
                 id, nombreAnterior, nuevoNombre, tecnicosActualizados, ordenesActualizadas);
 
         return mapearADto(actualizada);
+    }
+
+    @Transactional
+    public EspecialidadDto toggleEstadoEspecialidad(Long id) {
+        Especialidad esp = especialidadRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Especialidad no encontrada con ID: " + id));
+        esp.setActivo(!Boolean.TRUE.equals(esp.getActivo()));
+        Especialidad guardada = especialidadRepository.save(esp);
+        log.info("Estado de especialidad ID {} ('{}') cambiado a activo={}", id, guardada.getNombre(), guardada.getActivo());
+        return mapearADto(guardada);
     }
 
     @Transactional

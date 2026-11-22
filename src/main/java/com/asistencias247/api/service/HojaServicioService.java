@@ -68,6 +68,20 @@ public class HojaServicioService {
             );
         }
 
+        // 1b. Validación estricta de DNI antes de subir imágenes a Cloudinary
+        String dniCierreValidado = null;
+        if (request.getDniAfiliado() != null && !request.getDniAfiliado().isBlank()) {
+            String dniCierre = request.getDniAfiliado().trim();
+            if (!dniCierre.matches("^\\d{8}$")) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El DNI del afiliado debe contener exactamente 8 dígitos numéricos."
+                );
+            }
+            dniCierreValidado = dniCierre;
+        }
+        final String dniAfiliadoFinal = dniCierreValidado;
+
         // 2. Verificación preliminar rápida
         if (!ordenServicioRepository.existsById(ordenId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Orden no encontrada con ID: " + ordenId);
@@ -128,9 +142,8 @@ public class HojaServicioService {
             }
 
             if (request != null) {
-                if (request.getDniAfiliado() != null && !request.getDniAfiliado().isBlank()
-                        && orden.getAfiliado() != null) {
-                    orden.getAfiliado().setDni(request.getDniAfiliado().trim());
+                if (dniAfiliadoFinal != null && orden.getAfiliado() != null) {
+                    orden.getAfiliado().setDni(dniAfiliadoFinal);
                     log.info("DNI del afiliado actualizado durante el cierre de la orden {}", ordenId);
                 }
                 if (request.getEvaluacionAveria() != null) {

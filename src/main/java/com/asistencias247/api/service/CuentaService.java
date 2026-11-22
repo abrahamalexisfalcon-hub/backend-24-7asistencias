@@ -64,32 +64,41 @@ public class CuentaService {
 
     @Transactional
     public CuentaDto actualizarCuenta(Long id, ActualizarCuentaRequest request) {
-        String nuevoNombre = request.getNombre().trim();
-
         Cuenta cuenta = cuentaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuenta no encontrada con ID: " + id));
 
-        cuentaRepository.findByNombreIgnoreCase(nuevoNombre).ifPresent(existente -> {
-            if (!existente.getId().equals(id) && Boolean.TRUE.equals(existente.getActivo())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otra cuenta activa con el nombre: " + nuevoNombre);
-            }
-        });
+        if (request.getNombre() != null && !request.getNombre().isBlank()) {
+            String nuevoNombre = request.getNombre().trim();
+            cuentaRepository.findByNombreIgnoreCase(nuevoNombre).ifPresent(existente -> {
+                if (!existente.getId().equals(id)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otra cuenta registrada con el nombre: " + nuevoNombre);
+                }
+            });
+            cuenta.setNombre(nuevoNombre);
+        } else if (request.getNombre() != null && request.getNombre().isBlank() && request.getActivo() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre de la cuenta es obligatorio");
+        }
 
-        cuenta.setNombre(nuevoNombre);
         if (request.getActivo() != null) {
             cuenta.setActivo(request.getActivo());
         }
 
         Cuenta actualizada = cuentaRepository.save(cuenta);
-        log.info("Cuenta ID {} actualizada a '{}'", id, actualizada.getNombre());
+        log.info("Cuenta ID {} actualizada a '{}' (activo={})", id, actualizada.getNombre(), actualizada.getActivo());
         return mapearADto(actualizada);
     }
 
     @Transactional
     public CuentaDto toggleEstadoCuenta(Long id) {
+        return actualizarEstadoCuenta(id, null);
+    }
+
+    @Transactional
+    public CuentaDto actualizarEstadoCuenta(Long id, Boolean activo) {
         Cuenta cuenta = cuentaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cuenta no encontrada con ID: " + id));
-        cuenta.setActivo(!Boolean.TRUE.equals(cuenta.getActivo()));
+        boolean nuevoEstado = activo != null ? activo : !Boolean.TRUE.equals(cuenta.getActivo());
+        cuenta.setActivo(nuevoEstado);
         Cuenta guardada = cuentaRepository.save(cuenta);
         log.info("Estado de cuenta ID {} cambiado a activo={}", id, guardada.getActivo());
         return mapearADto(guardada);

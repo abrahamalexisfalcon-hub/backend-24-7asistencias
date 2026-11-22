@@ -25,7 +25,8 @@ public class AfiliadoService {
 
     @Transactional
     public Afiliado crearAfiliado(CrearAfiliadoRequest request) {
-        String dni = normalizarOpcional(request.getDni());
+        String dni = validarYNormalizarDni(request.getDni());
+        String telefono = validarYNormalizarTelefono(request.getTelefono());
 
         // Validar duplicado únicamente cuando el DNI fue proporcionado
         if (!dni.isEmpty() && afiliadoRepository.existsByDniAndActivoTrue(dni)) {
@@ -33,11 +34,13 @@ public class AfiliadoService {
         }
 
         // Si ya existía inactivo con ese DNI, lo reactivamos y actualizamos sus datos
-        Afiliado existente = dni.isEmpty() ? null : afiliadoRepository.findByDni(dni).orElse(null);
+        Afiliado existente = dni.isEmpty()
+                ? null
+                : afiliadoRepository.findAllByDniOrderByIdDesc(dni).stream().findFirst().orElse(null);
         if (existente != null && !Boolean.TRUE.equals(existente.getActivo())) {
             existente.setActivo(true);
             existente.setNombreCompleto(request.getNombreCompleto().trim());
-            existente.setTelefono(normalizarOpcional(request.getTelefono()));
+            existente.setTelefono(telefono);
             sincronizarDirecciones(existente, request.getDirecciones(), request.getDireccion(), request.getDistrito(), request.getReferencia());
             Afiliado reactivado = afiliadoRepository.save(existente);
             log.info("Afiliado DNI {} reactivado exitosamente con ID {}", dni, reactivado.getId());
@@ -53,7 +56,7 @@ public class AfiliadoService {
         Afiliado afiliado = Afiliado.builder()
                 .nombreCompleto(request.getNombreCompleto().trim())
                 .dni(dni)
-                .telefono(normalizarOpcional(request.getTelefono()))
+                .telefono(telefono)
                 .direccion("")
                 .distrito("Villa El Salvador")
                 .referencia("")
@@ -86,21 +89,22 @@ public class AfiliadoService {
     public Afiliado actualizarAfiliado(Long id, ActualizarAfiliadoRequest request) {
         Afiliado afiliado = obtenerPorId(id);
 
-        // Si se envió un DNI y es diferente, validar que no esté duplicado en otro afiliado activo
-        if (request.getDni() != null && !request.getDni().isBlank()) {
-            String nuevoDni = request.getDni().trim();
-            if (!nuevoDni.equalsIgnoreCase(afiliado.getDni())) {
-                afiliadoRepository.findByDniAndActivoTrue(nuevoDni).ifPresent(otro -> {
-                    if (!otro.getId().equals(id)) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otro afiliado activo con el DNI: " + nuevoDni);
-                    }
-                });
-                afiliado.setDni(nuevoDni);
+        String nuevoDni = validarYNormalizarDni(request.getDni());
+        String nuevoTel = validarYNormalizarTelefono(request.getTelefono());
+
+        if (nuevoDni.isEmpty()) {
+            afiliado.setDni("");
+        } else if (!nuevoDni.equalsIgnoreCase(afiliado.getDni())) {
+            boolean duplicadoEnOtroActivo = afiliadoRepository.findAllByDniAndActivoTrue(nuevoDni).stream()
+                    .anyMatch(otro -> !otro.getId().equals(id));
+            if (duplicadoEnOtroActivo) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ya existe otro afiliado activo con el DNI: " + nuevoDni);
             }
+            afiliado.setDni(nuevoDni);
         }
 
         afiliado.setNombreCompleto(request.getNombreCompleto().trim());
-        afiliado.setTelefono(normalizarOpcional(request.getTelefono()));
+        afiliado.setTelefono(nuevoTel);
         sincronizarDirecciones(afiliado, request.getDirecciones(), request.getDireccion(), request.getDistrito(), request.getReferencia());
 
         Afiliado actualizado = afiliadoRepository.save(afiliado);
@@ -219,10 +223,30 @@ public class AfiliadoService {
     }
 
     /**
-     * Normaliza datos opcionales para no romper restricciones NOT NULL heredadas
-     * de la base de datos cuando el DNI o el teléfono aún no se conocen.
+     * Valida y normaliza un DNI opcional: vacío si no se proporciona, o exactamente 8 dígitos numéricos.
      */
-    private String normalizarOpcional(String valor) {
-        return valor != null ? valor.trim() : "";
+    private String validarYNormalizarDni(String rawDni) {
+        if (rawDni == null || rawDni.isBlank()) {
+            return "";
+        }
+        String limpio = rawDni.trim();
+        if (!limpio.matches("^\\d{8}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El DNI debe contener exactamente 8 dígitos numéricos.");
+        }
+        return limpio;
+    }
+
+    /**
+     * Valida y normaliza un número de celular opcional: vacío si no se proporciona, o exactamente 9 dígitos numéricos.
+     */
+    private String validarYNormalizarTelefono(String rawTel) {
+        if (rawTel == null || rawTel.isBlank()) {
+            return "";
+        }
+        String limpio = rawTel.trim().replaceAll("\\s+", "");
+        if (!limpio.matches("^\\d{9}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El número de celular debe contener exactamente 9 dígitos numéricos.");
+        }
+        return limpio;
     }
 }

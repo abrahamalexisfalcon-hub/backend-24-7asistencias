@@ -14,8 +14,13 @@ public interface AfiliadoRepository extends JpaRepository<Afiliado, Long> {
 
     Optional<Afiliado> findByDni(String dni);
 
+    List<Afiliado> findAllByDniOrderByIdDesc(String dni);
+
     @Query("SELECT a FROM Afiliado a WHERE a.dni = :dni AND (a.activo IS NULL OR a.activo = true)")
     Optional<Afiliado> findByDniAndActivoTrue(@Param("dni") String dni);
+
+    @Query("SELECT a FROM Afiliado a WHERE a.dni = :dni AND (a.activo IS NULL OR a.activo = true) ORDER BY a.id DESC")
+    List<Afiliado> findAllByDniAndActivoTrue(@Param("dni") String dni);
 
     Optional<Afiliado> findByNumeroCuenta(String numeroCuenta);
 

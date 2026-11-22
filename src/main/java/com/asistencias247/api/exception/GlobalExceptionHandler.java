@@ -10,6 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,16 +31,28 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         List<String> validaciones = ex.getBindingResult()
-                .getFieldErrors()
+                .getAllErrors()
                 .stream()
-                .map(err -> err.getField() + ": " + err.getDefaultMessage())
+                .map(err -> {
+                    String msg = err.getDefaultMessage();
+                    if (msg != null && !msg.isBlank()) {
+                        return msg.trim();
+                    }
+                    if (err instanceof FieldError fe) {
+                        return fe.getField() + ": valor inválido";
+                    }
+                    return err.getObjectName() + ": error de validación";
+                })
+                .distinct()
                 .toList();
 
         ErrorResponseDto errorResponse = ErrorResponseDto.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
-                .message("Error de validación en los campos enviados")
+                .message(validaciones.isEmpty()
+                        ? "Error de validación en los campos enviados"
+                        : String.join(" | ", validaciones))
                 .path(request.getRequestURI())
                 .validaciones(validaciones)
                 .build();
@@ -55,11 +68,17 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
+        String message = (ex instanceof IllegalArgumentException
+                && ex.getMessage() != null
+                && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "Solicitud inválida: verifique el formato de los datos enviados";
+
         ErrorResponseDto errorResponse = ErrorResponseDto.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
-                .message("Solicitud inválida: verifique el formato de los datos enviados")
+                .message(message)
                 .path(request.getRequestURI())
                 .build();
 
